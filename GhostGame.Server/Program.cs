@@ -23,11 +23,10 @@ async Task HandeClientAsync(Socket connectionSocket)
     Console.WriteLine("Client connected!");
     var buffer = new byte[1024];
     var receive = new StringBuilder();
-    var result = 0;
-
+    
     do
     {
-        result = await connectionSocket.ReceiveAsync(buffer, SocketFlags.None);
+        var result = await connectionSocket.ReceiveAsync(buffer, SocketFlags.None);
         if (result == 0)
         {
             break;
@@ -40,7 +39,6 @@ async Task HandeClientAsync(Socket connectionSocket)
             new ArraySegment<byte>(Encoding.UTF8.GetBytes("Connection established!")),
             SocketFlags.None);
     } while (true);
-    
 }
 
 
