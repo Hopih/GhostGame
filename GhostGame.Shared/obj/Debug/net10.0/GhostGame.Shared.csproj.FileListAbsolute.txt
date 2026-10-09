@@ -1,0 +1,11 @@
+C:\Users\amirn\RiderProjects\GhostGame\GhostGame.Shared\obj\Debug\net10.0\GhostGame.Shared.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\amirn\RiderProjects\GhostGame\GhostGame.Shared\obj\Debug\net10.0\GhostGame.Shared.AssemblyInfoInputs.cache
+C:\Users\amirn\RiderProjects\GhostGame\GhostGame.Shared\obj\Debug\net10.0\GhostGame.Shared.AssemblyInfo.cs
+C:\Users\amirn\RiderProjects\GhostGame\GhostGame.Shared\obj\Debug\net10.0\GhostGame.Shared.csproj.CoreCompileInputs.cache
+C:\Users\amirn\RiderProjects\GhostGame\GhostGame.Shared\bin\Debug\net10.0\GhostGame.Shared.deps.json
+C:\Users\amirn\RiderProjects\GhostGame\GhostGame.Shared\bin\Debug\net10.0\GhostGame.Shared.dll
+C:\Users\amirn\RiderProjects\GhostGame\GhostGame.Shared\bin\Debug\net10.0\GhostGame.Shared.pdb
+C:\Users\amirn\RiderProjects\GhostGame\GhostGame.Shared\obj\Debug\net10.0\GhostGame.Shared.dll
+C:\Users\amirn\RiderProjects\GhostGame\GhostGame.Shared\obj\Debug\net10.0\refint\GhostGame.Shared.dll
+C:\Users\amirn\RiderProjects\GhostGame\GhostGame.Shared\obj\Debug\net10.0\GhostGame.Shared.pdb
+C:\Users\amirn\RiderProjects\GhostGame\GhostGame.Shared\obj\Debug\net10.0\ref\GhostGame.Shared.dll

@@ -1,0 +1,39 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v10.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v10.0": {
+      "GhostGame.Client/1.0.0": {
+        "dependencies": {
+          "GhostGame.Shared": "1.0.0"
+        },
+        "runtime": {
+          "GhostGame.Client.dll": {}
+        }
+      },
+      "GhostGame.Shared/1.0.0": {
+        "runtime": {
+          "GhostGame.Shared.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "GhostGame.Client/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "GhostGame.Shared/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

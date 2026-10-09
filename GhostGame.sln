@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GhostGame.Server", "GhostGame.Server\GhostGame.Server.csproj", "{7C809357-9732-4585-836C-F9DAC5FEA9DA}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GhostGame.Client", "GhostGame.Client\GhostGame.Client.csproj", "{2E097A63-BDCC-4A54-9D02-49CEB8302A85}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GhostGame.Shared", "GhostGame.Shared\GhostGame.Shared.csproj", "{AF413D74-C0D5-4AFA-833A-69179F5B6D3C}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{7C809357-9732-4585-836C-F9DAC5FEA9DA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7C809357-9732-4585-836C-F9DAC5FEA9DA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7C809357-9732-4585-836C-F9DAC5FEA9DA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7C809357-9732-4585-836C-F9DAC5FEA9DA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2E097A63-BDCC-4A54-9D02-49CEB8302A85}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2E097A63-BDCC-4A54-9D02-49CEB8302A85}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2E097A63-BDCC-4A54-9D02-49CEB8302A85}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2E097A63-BDCC-4A54-9D02-49CEB8302A85}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AF413D74-C0D5-4AFA-833A-69179F5B6D3C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AF413D74-C0D5-4AFA-833A-69179F5B6D3C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AF413D74-C0D5-4AFA-833A-69179F5B6D3C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AF413D74-C0D5-4AFA-833A-69179F5B6D3C}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
