@@ -1,33 +1,35 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\amirn\\RiderProjects\\GhostGame\\GhostGame.Client\\GhostGame.Client.csproj": {}
+    "C:\\GhostGame\\GhostGame.Client\\GhostGame.Client.csproj": {}
   },
   "projects": {
-    "C:\\Users\\amirn\\RiderProjects\\GhostGame\\GhostGame.Client\\GhostGame.Client.csproj": {
+    "C:\\GhostGame\\GhostGame.Client\\GhostGame.Client.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\amirn\\RiderProjects\\GhostGame\\GhostGame.Client\\GhostGame.Client.csproj",
+        "projectUniqueName": "C:\\GhostGame\\GhostGame.Client\\GhostGame.Client.csproj",
         "projectName": "GhostGame.Client",
-        "projectPath": "C:\\Users\\amirn\\RiderProjects\\GhostGame\\GhostGame.Client\\GhostGame.Client.csproj",
-        "packagesPath": "C:\\Users\\amirn\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\amirn\\RiderProjects\\GhostGame\\GhostGame.Client\\obj\\",
+        "projectPath": "C:\\GhostGame\\GhostGame.Client\\GhostGame.Client.csproj",
+        "packagesPath": "C:\\Users\\Amir\\.nuget\\packages\\",
+        "outputPath": "C:\\GhostGame\\GhostGame.Client\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "C:\\Users\\amirn\\AppData\\Roaming\\NuGet\\NuGet.Config"
+          "C:\\Users\\Amir\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
         "originalTargetFrameworks": [
           "net10.0"
         ],
         "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
           "net10.0": {
             "targetAlias": "net10.0",
             "projectReferences": {
-              "C:\\Users\\amirn\\RiderProjects\\GhostGame\\GhostGame.Shared\\GhostGame.Shared.csproj": {
-                "projectPath": "C:\\Users\\amirn\\RiderProjects\\GhostGame\\GhostGame.Shared\\GhostGame.Shared.csproj"
+              "C:\\GhostGame\\GhostGame.Shared\\GhostGame.Shared.csproj": {
+                "projectPath": "C:\\GhostGame\\GhostGame.Shared\\GhostGame.Shared.csproj"
               }
             }
           }
@@ -42,7 +44,7 @@
           "auditLevel": "low",
           "auditMode": "all"
         },
-        "SdkAnalysisLevel": "10.0.400"
+        "SdkAnalysisLevel": "10.0.200"
       },
       "frameworks": {
         "net10.0": {
@@ -63,7 +65,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.400/PortableRuntimeIdentifierGraph.json",
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.201/PortableRuntimeIdentifierGraph.json",
           "packagesToPrune": {
             "Microsoft.CSharp": "(,4.7.32767]",
             "Microsoft.VisualBasic": "(,10.4.32767]",
@@ -341,22 +343,24 @@
         }
       }
     },
-    "C:\\Users\\amirn\\RiderProjects\\GhostGame\\GhostGame.Shared\\GhostGame.Shared.csproj": {
+    "C:\\GhostGame\\GhostGame.Shared\\GhostGame.Shared.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\amirn\\RiderProjects\\GhostGame\\GhostGame.Shared\\GhostGame.Shared.csproj",
+        "projectUniqueName": "C:\\GhostGame\\GhostGame.Shared\\GhostGame.Shared.csproj",
         "projectName": "GhostGame.Shared",
-        "projectPath": "C:\\Users\\amirn\\RiderProjects\\GhostGame\\GhostGame.Shared\\GhostGame.Shared.csproj",
-        "packagesPath": "C:\\Users\\amirn\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\amirn\\RiderProjects\\GhostGame\\GhostGame.Shared\\obj\\",
+        "projectPath": "C:\\GhostGame\\GhostGame.Shared\\GhostGame.Shared.csproj",
+        "packagesPath": "C:\\Users\\Amir\\.nuget\\packages\\",
+        "outputPath": "C:\\GhostGame\\GhostGame.Shared\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "C:\\Users\\amirn\\AppData\\Roaming\\NuGet\\NuGet.Config"
+          "C:\\Users\\Amir\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
         "originalTargetFrameworks": [
           "net10.0"
         ],
         "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
@@ -375,7 +379,7 @@
           "auditLevel": "low",
           "auditMode": "all"
         },
-        "SdkAnalysisLevel": "10.0.400"
+        "SdkAnalysisLevel": "10.0.200"
       },
       "frameworks": {
         "net10.0": {
@@ -396,7 +400,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.400/PortableRuntimeIdentifierGraph.json",
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.201/PortableRuntimeIdentifierGraph.json",
           "packagesToPrune": {
             "Microsoft.CSharp": "(,4.7.32767]",
             "Microsoft.VisualBasic": "(,10.4.32767]",
