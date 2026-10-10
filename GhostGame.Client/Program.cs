@@ -2,6 +2,7 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using GhostGame.Shared;
 
 var socketClient = new Socket(
     AddressFamily.InterNetwork, 
@@ -17,36 +18,29 @@ while (livereload)
     await HandleClientAsync(socketClient);
 }
 
+socketClient.Close();
+
 async Task HandleClientAsync(Socket socketClient)
 {
     var command = Console.ReadLine();
-    if (command == "exit")
+    if (command == "exit" || command == null)
     {
         livereload = false;
         return;
     }
     
-    var bytesSent = await socketClient.SendAsync(
-        new ArraySegment<byte>(Encoding.UTF8.GetBytes("Hello from client!")),
-        SocketFlags.None);
+    var bytesSent = await PacketIO.SendPacketAsync(socketClient, Encoding.UTF8.GetBytes(command));
 
     Console.WriteLine($"send {bytesSent}");
-
-    var buffer = new byte[256];
-    var result = 0;
-    var resultMessage = new StringBuilder();
-    do
-    {
-        result = await socketClient.ReceiveAsync(buffer, SocketFlags.None);
-        resultMessage.Append(Encoding.UTF8.GetString(buffer));
-        if (result < buffer.Length)
-        {
-            break;
-        }
-    } while (result > 0);
-
-    Console.WriteLine(resultMessage.ToString());
     
+    var result = await PacketIO.ReceivePacketAsync(socketClient);
+    if (result == null)
+    {
+        livereload = false;
+        return;
+    }
+    
+    Console.WriteLine(Encoding.UTF8.GetString(result));
 }
 
 

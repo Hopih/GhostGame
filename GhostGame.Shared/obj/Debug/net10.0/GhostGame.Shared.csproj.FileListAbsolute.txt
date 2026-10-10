@@ -9,3 +9,15 @@ C:\Users\amirn\RiderProjects\GhostGame\GhostGame.Shared\obj\Debug\net10.0\GhostG
 C:\Users\amirn\RiderProjects\GhostGame\GhostGame.Shared\obj\Debug\net10.0\refint\GhostGame.Shared.dll
 C:\Users\amirn\RiderProjects\GhostGame\GhostGame.Shared\obj\Debug\net10.0\GhostGame.Shared.pdb
 C:\Users\amirn\RiderProjects\GhostGame\GhostGame.Shared\obj\Debug\net10.0\ref\GhostGame.Shared.dll
+C:\GhostGame\GhostGame.Shared\bin\Debug\net10.0\GhostGame.Shared.deps.json
+C:\GhostGame\GhostGame.Shared\bin\Debug\net10.0\GhostGame.Shared.dll
+C:\GhostGame\GhostGame.Shared\bin\Debug\net10.0\GhostGame.Shared.pdb
+C:\GhostGame\GhostGame.Shared\obj\Debug\net10.0\GhostGame.Shared.GeneratedMSBuildEditorConfig.editorconfig
+C:\GhostGame\GhostGame.Shared\obj\Debug\net10.0\GhostGame.Shared.AssemblyInfoInputs.cache
+C:\GhostGame\GhostGame.Shared\obj\Debug\net10.0\GhostGame.Shared.AssemblyInfo.cs
+C:\GhostGame\GhostGame.Shared\obj\Debug\net10.0\GhostGame.Shared.csproj.CoreCompileInputs.cache
+C:\GhostGame\GhostGame.Shared\obj\Debug\net10.0\GhostGame.Shared.sourcelink.json
+C:\GhostGame\GhostGame.Shared\obj\Debug\net10.0\GhostGame.Shared.dll
+C:\GhostGame\GhostGame.Shared\obj\Debug\net10.0\refint\GhostGame.Shared.dll
+C:\GhostGame\GhostGame.Shared\obj\Debug\net10.0\GhostGame.Shared.pdb
+C:\GhostGame\GhostGame.Shared\obj\Debug\net10.0\ref\GhostGame.Shared.dll

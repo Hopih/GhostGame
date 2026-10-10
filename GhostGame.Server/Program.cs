@@ -2,7 +2,7 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
-
+using GhostGame.Shared;
 var socketServer = new Socket(
     AddressFamily.InterNetwork,
     SocketType.Stream,
@@ -21,23 +21,18 @@ while (true)
 async Task HandeClientAsync(Socket connectionSocket)
 {
     Console.WriteLine("Client connected!");
-    var buffer = new byte[1024];
-    var receive = new StringBuilder();
     
     do
     {
-        var result = await connectionSocket.ReceiveAsync(buffer, SocketFlags.None);
-        if (result == 0)
+        var result = await PacketIO.ReceivePacketAsync(connectionSocket);
+        if (result == null)
         {
             break;
         }
-        receive.Append(Encoding.UTF8.GetString(buffer));
-        Console.WriteLine(receive.ToString());
-        receive.Clear();
-
-        var bytesSent = await connectionSocket.SendAsync(
-            new ArraySegment<byte>(Encoding.UTF8.GetBytes("Connection established!")),
-            SocketFlags.None);
+        var text = Encoding.UTF8.GetString(result);
+        Console.WriteLine(text);
+        
+        var bytesSent = await PacketIO.SendPacketAsync(connectionSocket, Encoding.UTF8.GetBytes("эхо: "  + text));
     } while (true);
 }
 

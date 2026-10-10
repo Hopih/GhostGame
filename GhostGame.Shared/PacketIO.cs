@@ -24,12 +24,12 @@ public static class PacketIO
         return buffer;
     }
 
-    public static async Task SendPacketAsync(Socket socket, byte[] data)
+    public static async Task<int> SendPacketAsync(Socket socket, byte[] data)
     {
         var packet = new byte[data.Length + 4];
         BinaryPrimitives.WriteInt32BigEndian(packet.AsSpan(0, 4), data.Length);
         data.CopyTo(packet.AsSpan(4));
-        await socket.SendAsync(packet, SocketFlags.None);
+        return await socket.SendAsync(packet, SocketFlags.None);
     }
 
     public static async Task<byte[]?> ReceivePacketAsync(Socket socket)
