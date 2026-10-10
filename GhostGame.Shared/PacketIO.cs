@@ -34,7 +34,7 @@ public static class PacketIO
 
     public static async Task<byte[]?> ReceivePacketAsync(Socket socket)
     {
-        var header = ReceiveExactlyAsync(socket, 4).Result;
+        var header = await ReceiveExactlyAsync(socket, 4);
         if (header is null)
         {
             return null;

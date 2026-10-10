@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("GhostGame.Shared")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+6531cc760cf4aa432a3568f0219849035c70d3e1")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+467b38598485c693908502f85f41cce4684f558b")]
 [assembly: System.Reflection.AssemblyProductAttribute("GhostGame.Shared")]
 [assembly: System.Reflection.AssemblyTitleAttribute("GhostGame.Shared")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
