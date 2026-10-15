@@ -3,41 +3,41 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using GhostGame.Shared;
+
+var port = args.Length > 0 ? int.Parse(args[0]) : 5000;
+
 var socketServer = new Socket(
     AddressFamily.InterNetwork,
-    SocketType.Stream,
-    ProtocolType.Tcp);
+    SocketType.Dgram,
+    ProtocolType.Udp);
 
-socketServer.Bind(
-    new IPEndPoint(new IPAddress(new byte[] { 127, 0, 0, 1 }), 5000));
-socketServer.Listen();
+PacketIO.DisableConnectionReset(socketServer);
+socketServer.Bind(new IPEndPoint(IPAddress.Any, port));
+Console.WriteLine($"Server listening on UDP port {port}");
+
+var buffer = new byte[PacketIO.ReceiveBufferSize];
 
 while (true)
 {
-    var connectionSocket = await socketServer.AcceptAsync();
-    _ = HandeClientAsync(connectionSocket);
-}
-
-async Task HandeClientAsync(Socket connectionSocket)
-{
-    Console.WriteLine("Client connected!");
-    
-    do
+    try
     {
-        var result = await PacketIO.ReceivePacketAsync(connectionSocket);
-        if (result == null)
+        var (packet, from) = await PacketIO.ReceivePacketAsync(socketServer, buffer);
+        if (packet == null)
         {
-            break;
+            Console.WriteLine($"[{from}] broken datagram, skipped");
+            continue;
         }
-        var text = Encoding.UTF8.GetString(result);
-        Console.WriteLine(text);
-        
-        var bytesSent = await PacketIO.SendPacketAsync(connectionSocket, Encoding.UTF8.GetBytes("эхо: "  + text));
-    } while (true);
+        var text = Encoding.UTF8.GetString(packet.Payload);
+        Console.WriteLine($"[{from}] {text}");
+
+        await PacketIO.SendPacketAsync(socketServer, from, packet.Type, 0, Encoding.UTF8.GetBytes("эхо: " + text));
+    }
+    catch (SocketException e)
+    {
+        Console.WriteLine($"Socket error: {e.SocketErrorCode}");
+    }
+    catch (Exception e)
+    {
+        Console.WriteLine($"Error: {e.Message}");
+    }
 }
-
-
-
-
-
-

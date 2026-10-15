@@ -1,51 +1,67 @@
 ﻿namespace GhostGame.Shared;
 using System;
+using System.Net;
 using System.Net.Sockets;
 using System.Buffers.Binary;
 
+public sealed record Packet(byte Type, uint Seq, byte[] Payload);
+
 public static class PacketIO
 {
-    private const int MaxPacketSize = 1024 * 1024;
-    
-    public static async Task<byte[]?> ReceiveExactlyAsync(Socket socket, int count)
+    public const ushort Magic = 0x4748;
+    public const int HeaderSize = 7;
+    public const int MaxDatagramSize = 1200;
+    public const int ReceiveBufferSize = 2048;
+
+    // magic: ushort | type: byte | seq: uint | payload
+    public static byte[] Build(byte type, uint seq, ReadOnlySpan<byte> payload)
     {
-        int offset = 0;
-        var buffer = new byte[count];
-        while (offset < count)
+        if (HeaderSize + payload.Length > MaxDatagramSize)
         {
-            var result = await socket.ReceiveAsync(buffer.AsMemory(offset,count - offset), SocketFlags.None);
-            if (result == 0)
-            {
-                return null;
-            }
-            offset += result;
-            
+            throw new ArgumentException($"Packet is larger than {MaxDatagramSize} bytes", nameof(payload));
         }
-        return buffer;
+        var packet = new byte[HeaderSize + payload.Length];
+        BinaryPrimitives.WriteUInt16BigEndian(packet.AsSpan(0, 2), Magic);
+        packet[2] = type;
+        BinaryPrimitives.WriteUInt32BigEndian(packet.AsSpan(3, 4), seq);
+        payload.CopyTo(packet.AsSpan(HeaderSize));
+        return packet;
     }
 
-    public static async Task<int> SendPacketAsync(Socket socket, byte[] data)
+    public static Packet? Parse(ReadOnlySpan<byte> datagram)
     {
-        var packet = new byte[data.Length + 4];
-        BinaryPrimitives.WriteInt32BigEndian(packet.AsSpan(0, 4), data.Length);
-        data.CopyTo(packet.AsSpan(4));
-        return await socket.SendAsync(packet, SocketFlags.None);
-    }
-
-    public static async Task<byte[]?> ReceivePacketAsync(Socket socket)
-    {
-        var header = await ReceiveExactlyAsync(socket, 4);
-        if (header is null)
+        if (datagram.Length < HeaderSize || BinaryPrimitives.ReadUInt16BigEndian(datagram) != Magic)
         {
             return null;
         }
-        var length = BinaryPrimitives.ReadInt32BigEndian(header.AsSpan(0, 4));
-        if (length > MaxPacketSize || length < 0)
-        {
-            return null;
-        }
-        var body = await ReceiveExactlyAsync(socket, length);
-        return body;
+        var type = datagram[2];
+        var seq = BinaryPrimitives.ReadUInt32BigEndian(datagram.Slice(3, 4));
+        return new Packet(type, seq, datagram.Slice(HeaderSize).ToArray());
     }
-    
+
+    public static async Task<int> SendPacketAsync(Socket socket, EndPoint to, byte type, uint seq, byte[] payload)
+    {
+        return await socket.SendToAsync(Build(type, seq, payload), SocketFlags.None, to);
+    }
+
+    // Packet is null when the datagram is broken (shorter than the header or foreign magic); From is always set.
+    public static async Task<(Packet? Packet, IPEndPoint From)> ReceivePacketAsync(
+        Socket socket, byte[] buffer, CancellationToken cancellationToken = default)
+    {
+        var result = await socket.ReceiveFromAsync(
+            buffer.AsMemory(), SocketFlags.None, new IPEndPoint(IPAddress.Any, 0), cancellationToken);
+        var from = (IPEndPoint)result.RemoteEndPoint;
+        return (Parse(buffer.AsSpan(0, result.ReceivedBytes)), from);
+    }
+
+    // Without this, Windows reports an ICMP "port unreachable" from any closed client
+    // as SocketException 10054 on the next ReceiveFrom, which kills the receive loop.
+    public static void DisableConnectionReset(Socket socket)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            const int SioUdpConnReset = -1744830452;
+            socket.IOControl((IOControlCode)SioUdpConnReset, new byte[4], null);
+        }
+    }
 }
