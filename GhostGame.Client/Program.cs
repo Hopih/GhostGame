@@ -15,11 +15,11 @@ var socketClient = new Socket(
     SocketType.Dgram,
     ProtocolType.Udp);
 
-// port 0 = let the OS pick a free one, so several clients can run on one PC
 socketClient.Bind(new IPEndPoint(IPAddress.Any, 0));
 
 var buffer = new byte[PacketIO.ReceiveBufferSize];
 bool livereload = true;
+bool first_packet = true;
 
 while (livereload)
 {
@@ -30,6 +30,12 @@ socketClient.Close();
 
 async Task HandleClientAsync(Socket socketClient)
 {
+    if (first_packet)
+    {
+        await PacketIO.SendPacketAsync(socketClient, server, EchoType, 0, Encoding.UTF8.GetBytes("Клиент подключен"));
+        first_packet = false;
+    }
+
     var command = Console.ReadLine();
     if (command == "exit" || command == null)
     {
@@ -50,6 +56,14 @@ async Task HandleClientAsync(Socket socketClient)
             Console.WriteLine("broken datagram from server");
             return;
         }
+
+        if (packet.Type == 0xF0)
+        {
+            Console.WriteLine(Encoding.UTF8.GetString(packet.Payload));
+            livereload = false;
+            return;
+        }
+        
         Console.WriteLine(Encoding.UTF8.GetString(packet.Payload));
     }
     catch (OperationCanceledException)

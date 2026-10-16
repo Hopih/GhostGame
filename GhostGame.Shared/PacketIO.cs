@@ -12,8 +12,7 @@ public static class PacketIO
     public const int HeaderSize = 7;
     public const int MaxDatagramSize = 1200;
     public const int ReceiveBufferSize = 2048;
-
-    // magic: ushort | type: byte | seq: uint | payload
+    
     public static byte[] Build(byte type, uint seq, ReadOnlySpan<byte> payload)
     {
         if (HeaderSize + payload.Length > MaxDatagramSize)
@@ -43,8 +42,7 @@ public static class PacketIO
     {
         return await socket.SendToAsync(Build(type, seq, payload), SocketFlags.None, to);
     }
-
-    // Packet is null when the datagram is broken (shorter than the header or foreign magic); From is always set.
+    
     public static async Task<(Packet? Packet, IPEndPoint From)> ReceivePacketAsync(
         Socket socket, byte[] buffer, CancellationToken cancellationToken = default)
     {
@@ -53,9 +51,7 @@ public static class PacketIO
         var from = (IPEndPoint)result.RemoteEndPoint;
         return (Parse(buffer.AsSpan(0, result.ReceivedBytes)), from);
     }
-
-    // Without this, Windows reports an ICMP "port unreachable" from any closed client
-    // as SocketException 10054 on the next ReceiveFrom, which kills the receive loop.
+    
     public static void DisableConnectionReset(Socket socket)
     {
         if (OperatingSystem.IsWindows())
