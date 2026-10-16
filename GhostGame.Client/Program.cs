@@ -35,15 +35,19 @@ async Task HandleClientAsync(Socket socketClient)
         await PacketIO.SendPacketAsync(socketClient, server, EchoType, 0, Encoding.UTF8.GetBytes("Клиент подключен"));
         first_packet = false;
     }
-
-    var command = Console.ReadLine();
-    if (command == "exit" || command == null)
+    
+    var w = new PacketWriter();
+    var command = Console.ReadLine() ?? "exit";
+    w.WriteString(command);
+    
+    if (command == "exit")
     {
+        await PacketIO.SendPacketAsync(socketClient, server, EchoType, 0, w.ToArray());
         livereload = false;
         return;
     }
 
-    var bytesSent = await PacketIO.SendPacketAsync(socketClient, server, EchoType, 0, Encoding.UTF8.GetBytes(command));
+    var bytesSent = await PacketIO.SendPacketAsync(socketClient, server, EchoType, 0, w.ToArray());
 
     Console.WriteLine($"send {bytesSent}");
 

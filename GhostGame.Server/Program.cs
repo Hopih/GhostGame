@@ -29,18 +29,24 @@ while (true)
             continue;
         }
         
-        clients[from] = Environment.TickCount64; //храним последнее время ответа
+        var r = new PacketReader(packet.Payload);
+        var pw = new PacketWriter();  
+        
         if (clients.Keys.Count > 5)
         {
-            await PacketIO.SendPacketAsync(socketServer, from, 0xF0, 0, Encoding.UTF8.GetBytes("Сервер заполнен"));
+            var w = new PacketWriter();
+            w.WriteString("Комната заполнена");
+            await PacketIO.SendPacketAsync(socketServer, from, 0xF0, 0, w.ToArray());
             clients.Remove(from);
             continue;
         }
-            
-        var text = Encoding.UTF8.GetString(packet.Payload);
+        var text = r.ReadString();
+        r.EnsureEnd();
+        clients[from] = Environment.TickCount64; //храним последнее время ответа
+        
         Console.WriteLine($"[{from}] {text}");
-
-        await PacketIO.SendPacketAsync(socketServer, from, packet.Type, 0, Encoding.UTF8.GetBytes("эхо: " + text));
+        pw.WriteString("эхо: " + text);
+        await PacketIO.SendPacketAsync(socketServer, from, packet.Type, 0, pw.ToArray());
     }
     catch (SocketException e)
     {
