@@ -71,6 +71,10 @@ while (true)
     {
         Console.WriteLine($"Socket error: {e.SocketErrorCode}");
     }
+    catch (OperationCanceledException)
+    {
+        // за секунду ничего не пришло — это нормально, идём на новый круг
+    }
     catch (Exception e)
     {
         Console.WriteLine($"Error: {e.Message}");
