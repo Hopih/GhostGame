@@ -2,6 +2,7 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using GhostGame.Server;
 using GhostGame.Shared;
 
 var port = args.Length > 0 ? int.Parse(args[0]) : 5000;
@@ -16,7 +17,7 @@ socketServer.Bind(new IPEndPoint(IPAddress.Any, port));
 Console.WriteLine($"Server listening on UDP port {port}");
 
 var buffer = new byte[PacketIO.ReceiveBufferSize];
-Dictionary<IPEndPoint , long> clients = new Dictionary<IPEndPoint, long>();
+Dictionary<IPEndPoint , ClientSession> clients = new Dictionary<IPEndPoint, ClientSession>();
 
 while (true)
 {
@@ -32,24 +33,31 @@ while (true)
             continue;
         }
         
+        
+        if (clients.Keys.Count >= 5 && !clients.ContainsKey(from))
+        {
+            await PacketIO.SendPacketAsync(socketServer, from, PacketType.Error, 0,
+                Packets.WriteError(ErrorCode.RoomFull, "Комната заполнена"));
+            continue;
+        }
+        
         try
         {
             if (packet.Type == PacketType.Hello)
             {
                 var (version, nick) = Packets.ReadHello(packet.Payload);
                 Console.WriteLine($"[{from}] Hello: {nick}, version {version}");
+                clients[from] = new ClientSession(nick);
                 continue;
             }
-
-            if (clients.Keys.Count >= 5 && !clients.ContainsKey(from))
+            
+            if (!clients.ContainsKey(from))
             {
-                await PacketIO.SendPacketAsync(socketServer, from, PacketType.Error, 0,
-                    Packets.WriteError(ErrorCode.RoomFull, "Комната заполнена"));
                 continue;
             }
 
             var text = Packets.ReadChat(packet.Payload);
-            clients[from] = Environment.TickCount64; //храним последнее время ответа
+            clients[from].LastPing = Environment.TickCount64; //храним последнее время ответа
             Console.WriteLine($"[{from}] {text}");
             await PacketIO.SendPacketAsync(socketServer, from, packet.Type, 0, Packets.WriteChat("эхо: " + text));
         }
@@ -67,13 +75,16 @@ while (true)
         Console.WriteLine($"Error: {e.Message}");
     }
 }
-void CheckTimeOut(Dictionary<IPEndPoint, long> clients)
+async Task CheckTimeOut(Dictionary<IPEndPoint, ClientSession> clients)
 {
     foreach (var client in clients.Keys)
     {
-        if (Environment.TickCount64 - clients[client] > 10000)
+        if (Environment.TickCount64 - clients[client].LastPing > 10000)
         {
+            Console.WriteLine($"Игрок {clients[client].Nick} отключен");
+            await PacketIO.SendPacketAsync(socketServer, client, PacketType.Disconnect , 0, Packets.WriteChat("Вы отключены"));
             clients.Remove(client);
         }
     }
 }
+
