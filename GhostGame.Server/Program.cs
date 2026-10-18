@@ -21,11 +21,12 @@ Dictionary<IPEndPoint , ClientSession> clients = new Dictionary<IPEndPoint, Clie
 
 while (true)
 {
+    await CheckTimeOut(clients);
+    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+    
     try
     {
-        var (packet, from) = await PacketIO.ReceivePacketAsync(socketServer, buffer);
-        
-        CheckTimeOut(clients);
+        var (packet, from) = await PacketIO.ReceivePacketAsync(socketServer, buffer , cts.Token);
         
         if (packet == null || packet.Type == PacketType.Error)
         {
