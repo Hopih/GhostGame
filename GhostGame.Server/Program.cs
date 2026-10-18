@@ -23,30 +23,46 @@ while (true)
     try
     {
         var (packet, from) = await PacketIO.ReceivePacketAsync(socketServer, buffer);
-        if (packet == null)
+        
+        CheckTimeOut(clients);
+        
+        if (packet == null || packet.Type == PacketType.Error)
         {
             Console.WriteLine($"[{from}] broken datagram, skipped");
             continue;
         }
         
         var r = new PacketReader(packet.Payload);
-        var pw = new PacketWriter();  
+        var pw = new PacketWriter();
+
+        if (packet.Type == PacketType.Hello)
+        {
+            Console.WriteLine(r.ReadString()); 
+            continue;
+        }
         
-        if (clients.Keys.Count > 5)
+        if (clients.Keys.Count >= 5 && !clients.ContainsKey(from))
         {
             var w = new PacketWriter();
             w.WriteString("Комната заполнена");
-            await PacketIO.SendPacketAsync(socketServer, from, 0xF0, 0, w.ToArray());
+            await PacketIO.SendPacketAsync(socketServer, from, PacketType.Error, 0, w.ToArray());
             clients.Remove(from);
             continue;
         }
-        var text = r.ReadString();
-        r.EnsureEnd();
-        clients[from] = Environment.TickCount64; //храним последнее время ответа
-        
-        Console.WriteLine($"[{from}] {text}");
-        pw.WriteString("эхо: " + text);
-        await PacketIO.SendPacketAsync(socketServer, from, packet.Type, 0, pw.ToArray());
+
+        try
+        {
+            var text = r.ReadString();
+            r.EnsureEnd();
+            clients[from] = Environment.TickCount64; //храним последнее время ответа
+            Console.WriteLine($"[{from}] {text}");
+            pw.WriteString("эхо: " + text);
+            await PacketIO.SendPacketAsync(socketServer, from, packet.Type, 0, pw.ToArray());
+        }
+        catch (MalformedPacketException e)
+        {
+            Console.WriteLine($"{from} {e.Message}");
+        }
     }
     catch (SocketException e)
     {
@@ -55,5 +71,15 @@ while (true)
     catch (Exception e)
     {
         Console.WriteLine($"Error: {e.Message}");
+    }
+}
+void CheckTimeOut(Dictionary<IPEndPoint, long> clients)
+{
+    foreach (var client in clients.Keys)
+    {
+        if (Environment.TickCount64 - clients[client] > 10000)
+        {
+            clients.Remove(client);
+        }
     }
 }

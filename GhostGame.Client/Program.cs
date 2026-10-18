@@ -4,7 +4,7 @@ using System.Net.Sockets;
 using System.Text;
 using GhostGame.Shared;
 
-const byte EchoType = 1;
+const PacketType EchoType = PacketType.Chat;
 
 var server = new IPEndPoint(
     args.Length > 0 ? IPAddress.Parse(args[0]) : IPAddress.Loopback,
@@ -29,14 +29,16 @@ while (livereload)
 socketClient.Close();
 
 async Task HandleClientAsync(Socket socketClient)
-{
+{   
+    var w = new PacketWriter();
     if (first_packet)
     {
-        await PacketIO.SendPacketAsync(socketClient, server, EchoType, 0, Encoding.UTF8.GetBytes("Клиент подключен"));
+        w.WriteString("Клиент подключен");
+        await PacketIO.SendPacketAsync(socketClient, server, PacketType.Hello, 0, w.ToArray());
+        w.Clear();
         first_packet = false;
     }
     
-    var w = new PacketWriter();
     var command = Console.ReadLine() ?? "exit";
     w.WriteString(command);
     
@@ -60,15 +62,20 @@ async Task HandleClientAsync(Socket socketClient)
             Console.WriteLine("broken datagram from server");
             return;
         }
-
-        if (packet.Type == 0xF0)
-        {
-            Console.WriteLine(Encoding.UTF8.GetString(packet.Payload));
-            livereload = false;
-            return;
-        }
         
-        Console.WriteLine(Encoding.UTF8.GetString(packet.Payload));
+        var r = new PacketReader(packet.Payload);
+        var text = r.ReadString();
+        r.EnsureEnd();
+        Console.WriteLine(text);
+
+        if (packet.Type == PacketType.Error)
+        {
+            livereload = false;
+        }
+    }
+    catch (MalformedPacketException e)
+    {
+        Console.WriteLine($"broken datagram from server: {e.Message}");
     }
     catch (OperationCanceledException)
     {
@@ -79,3 +86,4 @@ async Task HandleClientAsync(Socket socketClient)
         Console.WriteLine($"server {server} is not running");
     }
 }
+

@@ -77,6 +77,11 @@ public class PacketWriter
     {
         return buffer.ToArray();
     }
+    
+    public void Clear()
+    {
+        buffer.Clear();
+    }
 
     private void EnsureSpace(int size)
     {

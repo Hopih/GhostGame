@@ -4,7 +4,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Buffers.Binary;
 
-public sealed record Packet(byte Type, uint Seq, byte[] Payload);
+public sealed record Packet(PacketType Type, uint Seq, byte[] Payload);
 
 public static class PacketIO
 {
@@ -13,7 +13,7 @@ public static class PacketIO
     public const int MaxDatagramSize = 1200;
     public const int ReceiveBufferSize = 2048;
     
-    public static byte[] Build(byte type, uint seq, ReadOnlySpan<byte> payload)
+    public static byte[] Build(PacketType type, uint seq, ReadOnlySpan<byte> payload)
     {
         if (HeaderSize + payload.Length > MaxDatagramSize)
         {
@@ -21,7 +21,7 @@ public static class PacketIO
         }
         var packet = new byte[HeaderSize + payload.Length];
         BinaryPrimitives.WriteUInt16BigEndian(packet.AsSpan(0, 2), Magic);
-        packet[2] = type;
+        packet[2] = (byte)type;
         BinaryPrimitives.WriteUInt32BigEndian(packet.AsSpan(3, 4), seq);
         payload.CopyTo(packet.AsSpan(HeaderSize));
         return packet;
@@ -33,12 +33,16 @@ public static class PacketIO
         {
             return null;
         }
-        var type = datagram[2];
+        var type = (PacketType)datagram[2];
+        if (!Enum.IsDefined(type))
+        {
+            return null;
+        }
         var seq = BinaryPrimitives.ReadUInt32BigEndian(datagram.Slice(3, 4));
         return new Packet(type, seq, datagram.Slice(HeaderSize).ToArray());
     }
 
-    public static async Task<int> SendPacketAsync(Socket socket, EndPoint to, byte type, uint seq, byte[] payload)
+    public static async Task<int> SendPacketAsync(Socket socket, EndPoint to, PacketType type, uint seq, byte[] payload)
     {
         return await socket.SendToAsync(Build(type, seq, payload), SocketFlags.None, to);
     }
