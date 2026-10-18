@@ -30,26 +30,24 @@ socketClient.Close();
 
 async Task HandleClientAsync(Socket socketClient)
 {   
-    var w = new PacketWriter();
     if (first_packet)
     {
-        w.WriteString("Клиент подключен");
-        await PacketIO.SendPacketAsync(socketClient, server, PacketType.Hello, 0, w.ToArray());
-        w.Clear();
+        Console.Write("Ник: ");
+        var nick = Console.ReadLine() ?? "";
+        await PacketIO.SendPacketAsync(socketClient, server, PacketType.Hello, 0, Packets.WriteHello(1, nick));
         first_packet = false;
     }
-    
+
     var command = Console.ReadLine() ?? "exit";
-    w.WriteString(command);
-    
+
     if (command == "exit")
     {
-        await PacketIO.SendPacketAsync(socketClient, server, EchoType, 0, w.ToArray());
+        await PacketIO.SendPacketAsync(socketClient, server, EchoType, 0, Packets.WriteChat(command));
         livereload = false;
         return;
     }
 
-    var bytesSent = await PacketIO.SendPacketAsync(socketClient, server, EchoType, 0, w.ToArray());
+    var bytesSent = await PacketIO.SendPacketAsync(socketClient, server, EchoType, 0, Packets.WriteChat(command));
 
     Console.WriteLine($"send {bytesSent}");
 
@@ -63,15 +61,15 @@ async Task HandleClientAsync(Socket socketClient)
             return;
         }
         
-        var r = new PacketReader(packet.Payload);
-        var text = r.ReadString();
-        r.EnsureEnd();
-        Console.WriteLine(text);
-
         if (packet.Type == PacketType.Error)
         {
+            var (code, message) = Packets.ReadError(packet.Payload);
+            Console.WriteLine($"Ошибка {code}: {message}");
             livereload = false;
+            return;
         }
+
+        Console.WriteLine(Packets.ReadChat(packet.Payload));
     }
     catch (MalformedPacketException e)
     {

@@ -32,32 +32,26 @@ while (true)
             continue;
         }
         
-        var r = new PacketReader(packet.Payload);
-        var pw = new PacketWriter();
-
-        if (packet.Type == PacketType.Hello)
-        {
-            Console.WriteLine(r.ReadString()); 
-            continue;
-        }
-        
-        if (clients.Keys.Count >= 5 && !clients.ContainsKey(from))
-        {
-            var w = new PacketWriter();
-            w.WriteString("Комната заполнена");
-            await PacketIO.SendPacketAsync(socketServer, from, PacketType.Error, 0, w.ToArray());
-            clients.Remove(from);
-            continue;
-        }
-
         try
         {
-            var text = r.ReadString();
-            r.EnsureEnd();
+            if (packet.Type == PacketType.Hello)
+            {
+                var (version, nick) = Packets.ReadHello(packet.Payload);
+                Console.WriteLine($"[{from}] Hello: {nick}, version {version}");
+                continue;
+            }
+
+            if (clients.Keys.Count >= 5 && !clients.ContainsKey(from))
+            {
+                await PacketIO.SendPacketAsync(socketServer, from, PacketType.Error, 0,
+                    Packets.WriteError(ErrorCode.RoomFull, "Комната заполнена"));
+                continue;
+            }
+
+            var text = Packets.ReadChat(packet.Payload);
             clients[from] = Environment.TickCount64; //храним последнее время ответа
             Console.WriteLine($"[{from}] {text}");
-            pw.WriteString("эхо: " + text);
-            await PacketIO.SendPacketAsync(socketServer, from, packet.Type, 0, pw.ToArray());
+            await PacketIO.SendPacketAsync(socketServer, from, packet.Type, 0, Packets.WriteChat("эхо: " + text));
         }
         catch (MalformedPacketException e)
         {
