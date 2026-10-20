@@ -18,11 +18,12 @@ Console.WriteLine($"Server listening on UDP port {port}");
 
 var buffer = new byte[PacketIO.ReceiveBufferSize];
 Dictionary<IPEndPoint , ClientSession> clients = new Dictionary<IPEndPoint, ClientSession>();
+HashSet<string> nicks = new HashSet<string>();
 
 while (true)
 {
     await CheckTimeOut(clients);
-    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
     
     try
     {
@@ -47,8 +48,18 @@ while (true)
             if (packet.Type == PacketType.Hello)
             {
                 var (version, nick) = Packets.ReadHello(packet.Payload);
+                
+                while (nicks.Contains(nick))
+                {
+                    await PacketIO.SendPacketAsync(socketServer, from, PacketType.Chat, 0,
+                        Packets.WriteChat($"Ник занят , введите другой"));
+                    nick = Console.ReadLine();
+                }
+                nicks.Add(nick);
+                
                 Console.WriteLine($"[{from}] Hello: {nick}, version {version}");
                 clients[from] = new ClientSession(nick);
+                await PacketIO.SendPacketAsync(socketServer, from, PacketType.Hello, 0, Packets.WriteChat($"Подключено, ваш id = {clients[from].PlayerId}"));
                 continue;
             }
             
@@ -73,6 +84,7 @@ while (true)
     }
     catch (OperationCanceledException)
     {
+        Console.WriteLine("Сервер не отвечает");
         // за секунду ничего не пришло — это нормально, идём на новый круг
     }
     catch (Exception e)

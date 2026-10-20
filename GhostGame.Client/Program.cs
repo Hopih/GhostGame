@@ -68,7 +68,7 @@ async Task HandleClientAsync(Socket socketClient)
             livereload = false;
             return;
         }
-
+        
         Console.WriteLine(Packets.ReadChat(packet.Payload));
     }
     catch (MalformedPacketException e)
