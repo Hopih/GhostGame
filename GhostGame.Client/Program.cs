@@ -19,7 +19,53 @@ socketClient.Bind(new IPEndPoint(IPAddress.Any, 0));
 
 var buffer = new byte[PacketIO.ReceiveBufferSize];
 bool livereload = true;
-bool first_packet = true;
+
+while (true)
+{
+    Console.Write("Ник: ");
+    var nick = Console.ReadLine() ?? "";
+    await PacketIO.SendPacketAsync(socketClient, server, PacketType.Hello, 0, Packets.WriteHello(1, nick));
+
+    using var helloTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+    try
+    {
+        var (reply, _) = await PacketIO.ReceivePacketAsync(socketClient, buffer, helloTimeout.Token);
+        if (reply == null)
+        {
+            Console.WriteLine("broken datagram from server");
+            continue;
+        }
+
+        if (reply.Type == PacketType.Welcome)
+        {
+            Console.WriteLine($"Подключено, ваш id: {Packets.ReadWelcome(reply.Payload)}");
+            break;
+        }
+
+        if (reply.Type == PacketType.Error)
+        {
+            var (code, message) = Packets.ReadError(reply.Payload);
+            Console.WriteLine($"Ошибка {code}: {message}");
+            continue;
+        }
+
+        Console.WriteLine($"unexpected packet from server: {reply.Type}");
+    }
+    catch (MalformedPacketException e)
+    {
+        Console.WriteLine($"broken datagram from server: {e.Message}");
+    }
+    catch (OperationCanceledException)
+    {
+        Console.WriteLine("Сервер не отвечает");
+        return;
+    }
+    catch (SocketException e) when (e.SocketErrorCode == SocketError.ConnectionReset)
+    {
+        Console.WriteLine("Сервер не отвечает");
+        return;
+    }
+}
 
 while (livereload)
 {
@@ -29,15 +75,7 @@ while (livereload)
 socketClient.Close();
 
 async Task HandleClientAsync(Socket socketClient)
-{   
-    if (first_packet)
-    {
-        Console.Write("Ник: ");
-        var nick = Console.ReadLine() ?? "";
-        await PacketIO.SendPacketAsync(socketClient, server, PacketType.Hello, 0, Packets.WriteHello(1, nick));
-        first_packet = false;
-    }
-
+{
     var command = Console.ReadLine() ?? "exit";
 
     if (command == "exit")
@@ -68,7 +106,14 @@ async Task HandleClientAsync(Socket socketClient)
             livereload = false;
             return;
         }
-        
+
+        if (packet.Type == PacketType.ServerDisconnect)
+        {
+            Console.WriteLine($"Сервер отключил вас: {Packets.ReadServerDisconnect(packet.Payload)}");
+            livereload = false;
+            return;
+        }
+
         Console.WriteLine(Packets.ReadChat(packet.Payload));
     }
     catch (MalformedPacketException e)

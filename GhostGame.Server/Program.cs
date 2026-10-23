@@ -18,12 +18,11 @@ Console.WriteLine($"Server listening on UDP port {port}");
 
 var buffer = new byte[PacketIO.ReceiveBufferSize];
 Dictionary<IPEndPoint , ClientSession> clients = new Dictionary<IPEndPoint, ClientSession>();
-HashSet<string> nicks = new HashSet<string>();
 
 while (true)
 {
     await CheckTimeOut(clients);
-    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
     
     try
     {
@@ -36,42 +35,71 @@ while (true)
         }
         
         
-        if (clients.Keys.Count >= 5 && !clients.ContainsKey(from))
-        {
-            await PacketIO.SendPacketAsync(socketServer, from, PacketType.Error, 0,
-                Packets.WriteError(ErrorCode.RoomFull, "Комната заполнена"));
-            continue;
-        }
-        
         try
         {
             if (packet.Type == PacketType.Hello)
             {
                 var (version, nick) = Packets.ReadHello(packet.Payload);
-                
-                while (nicks.Contains(nick))
+
+                if (clients.TryGetValue(from, out var existing))
                 {
-                    await PacketIO.SendPacketAsync(socketServer, from, PacketType.Chat, 0,
-                        Packets.WriteChat($"Ник занят , введите другой"));
-                    nick = Console.ReadLine();
+                    // повторный Hello с того же адреса: второго игрока не создаём (ТЗ 3.7)
+                    existing.LastPing = Environment.TickCount64;
+                    await PacketIO.SendPacketAsync(socketServer, from, PacketType.Welcome, 0,
+                        Packets.WriteWelcome(existing.PlayerId));
+                    continue;
                 }
-                nicks.Add(nick);
-                
-                Console.WriteLine($"[{from}] Hello: {nick}, version {version}");
-                clients[from] = new ClientSession(nick);
-                await PacketIO.SendPacketAsync(socketServer, from, PacketType.Hello, 0, Packets.WriteChat($"Подключено, ваш id = {clients[from].PlayerId}"));
-                continue;
-            }
-            
-            if (!clients.ContainsKey(from))
-            {
+
+                if (version != 1)
+                {
+                    await PacketIO.SendPacketAsync(socketServer, from, PacketType.Error, 0,
+                        Packets.WriteError(ErrorCode.UnsupportedVersion, "Версия не поддерживается"));
+                    continue;
+                }
+
+                if (nick.Length < 3 || nick.Length > 16 || clients.Values.Any(s => s.Nick == nick))
+                {
+                    await PacketIO.SendPacketAsync(socketServer, from, PacketType.Error, 0,
+                        Packets.WriteError(ErrorCode.BadNick, "Ник занят или некорректен"));
+                    continue;
+                }
+
+                if (clients.Count >= 5)
+                {
+                    await PacketIO.SendPacketAsync(socketServer, from, PacketType.Error, 0,
+                        Packets.WriteError(ErrorCode.RoomFull, "Комната заполнена"));
+                    continue;
+                }
+
+                var newSession = new ClientSession(nick);
+                clients[from] = newSession;
+                await PacketIO.SendPacketAsync(socketServer, from, PacketType.Welcome, 0,
+                    Packets.WriteWelcome(newSession.PlayerId));
+                Console.WriteLine($"[{from}] {nick} подключился, id {newSession.PlayerId}");
                 continue;
             }
 
-            var text = Packets.ReadChat(packet.Payload);
-            clients[from].LastPing = Environment.TickCount64; //храним последнее время ответа
-            Console.WriteLine($"[{from}] {text}");
-            await PacketIO.SendPacketAsync(socketServer, from, packet.Type, 0, Packets.WriteChat("эхо: " + text));
+            if (!clients.TryGetValue(from, out var session))
+            {
+                // незнакомый адрес и не Hello — молча отбрасываем (ТЗ 4.5)
+                continue;
+            }
+            session.LastPing = Environment.TickCount64; //храним последнее время ответа
+
+            switch (packet.Type)
+            {
+                case PacketType.Chat:
+                    var text = Packets.ReadChat(packet.Payload);
+                    Console.WriteLine($"[{from}] {text}");
+                    await PacketIO.SendPacketAsync(socketServer, from, PacketType.Chat, 0, Packets.WriteChat("эхо: " + text));
+                    break;
+
+                default:
+                    Console.WriteLine($"[{from}] unexpected packet {packet.Type}");
+                    await PacketIO.SendPacketAsync(socketServer, from, PacketType.Error, 0,
+                        Packets.WriteError(ErrorCode.UnexpectedPacket, $"Пакет {packet.Type} не ожидается"));
+                    break;
+            }
         }
         catch (MalformedPacketException e)
         {
@@ -84,7 +112,6 @@ while (true)
     }
     catch (OperationCanceledException)
     {
-        Console.WriteLine("Сервер не отвечает");
         // за секунду ничего не пришло — это нормально, идём на новый круг
     }
     catch (Exception e)
@@ -98,8 +125,9 @@ async Task CheckTimeOut(Dictionary<IPEndPoint, ClientSession> clients)
     {
         if (Environment.TickCount64 - clients[client].LastPing > 10000)
         {
-            Console.WriteLine($"Игрок {clients[client].Nick} отключен");
-            await PacketIO.SendPacketAsync(socketServer, client, PacketType.Disconnect , 0, Packets.WriteChat("Вы отключены"));
+            Console.WriteLine($"Игрок {clients[client].Nick} отключен: таймаут");
+            await PacketIO.SendPacketAsync(socketServer, client, PacketType.ServerDisconnect, 0,
+                Packets.WriteServerDisconnect(DisconnectReason.Timeout));
             clients.Remove(client);
         }
     }

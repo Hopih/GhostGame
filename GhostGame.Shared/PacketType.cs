@@ -19,7 +19,6 @@ public enum PacketType : byte
 
     // Сервер → клиент (ТЗ 3.5)
     Welcome = 0x81,
-    Disconnect = 0x80,
     Pong = 0x82,
     ServerDisconnect = 0x83,
     RoomList = 0x90,

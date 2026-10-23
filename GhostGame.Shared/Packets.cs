@@ -52,6 +52,22 @@ public static class Packets
         return playerId;
     }
 
+    // ServerDisconnect: reason: byte (ТЗ 3.5)
+    public static byte[] WriteServerDisconnect(DisconnectReason reason)
+    {
+        var w = new PacketWriter();
+        w.WriteByte((byte)reason);
+        return w.ToArray();
+    }
+
+    public static DisconnectReason ReadServerDisconnect(byte[] payload)
+    {
+        var r = new PacketReader(payload);
+        var reason = (DisconnectReason)r.ReadByte();
+        r.EnsureEnd();
+        return reason;
+    }
+
     // Error: code: byte, message: string (ТЗ 3.5)
     public static byte[] WriteError(ErrorCode code, string message)
     {
