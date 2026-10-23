@@ -42,11 +42,6 @@ public static class PacketIO
         return new Packet(type, seq, datagram.Slice(HeaderSize).ToArray());
     }
 
-    public static async Task<int> SendPacketAsync(Socket socket, EndPoint to, PacketType type, uint seq, byte[] payload)
-    {
-        return await socket.SendToAsync(Build(type, seq, payload), SocketFlags.None, to);
-    }
-    
     public static async Task<(Packet? Packet, IPEndPoint From)> ReceivePacketAsync(
         Socket socket, byte[] buffer, CancellationToken cancellationToken = default)
     {

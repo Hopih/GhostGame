@@ -36,6 +36,67 @@ public static class Packets
         return text;
     }
 
+    // Ping: sentAt: long, мс (ТЗ 3.4)
+    public static byte[] WritePing(long sentAt)
+    {
+        var w = new PacketWriter();
+        w.WriteLong(sentAt);
+        return w.ToArray();
+    }
+
+    public static long ReadPing(byte[] payload)
+    {
+        var r = new PacketReader(payload);
+        var sentAt = r.ReadLong();
+        r.EnsureEnd();
+        return sentAt;
+    }
+
+    // Pong: sentAt: long, копия из Ping как есть (ТЗ 3.5)
+    public static byte[] WritePong(long sentAt)
+    {
+        return WritePing(sentAt);
+    }
+
+    public static long ReadPong(byte[] payload)
+    {
+        return ReadPing(payload);
+    }
+
+    // Ack: ackSeq: uint (ТЗ 3.4, 3.5 — в обе стороны)
+    public static byte[] WriteAck(uint ackSeq)
+    {
+        var w = new PacketWriter();
+        w.WriteUInt(ackSeq);
+        return w.ToArray();
+    }
+
+    public static uint ReadAck(byte[] payload)
+    {
+        var r = new PacketReader(payload);
+        var ackSeq = r.ReadUInt();
+        r.EnsureEnd();
+        return ackSeq;
+    }
+
+    // ChatMessage: playerId: int, text: string (ТЗ 3.5)
+    public static byte[] WriteChatMessage(int playerId, string text)
+    {
+        var w = new PacketWriter();
+        w.WriteInt(playerId);
+        w.WriteString(text);
+        return w.ToArray();
+    }
+
+    public static (int PlayerId, string Text) ReadChatMessage(byte[] payload)
+    {
+        var r = new PacketReader(payload);
+        var playerId = r.ReadInt();
+        var text = r.ReadString();
+        r.EnsureEnd();
+        return (playerId, text);
+    }
+
     // Welcome: playerId: int (ТЗ 3.5)
     public static byte[] WriteWelcome(int playerId)
     {

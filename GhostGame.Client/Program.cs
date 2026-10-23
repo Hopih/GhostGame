@@ -1,10 +1,6 @@
-﻿using System;
-using System.Net;
+﻿using System.Net;
 using System.Net.Sockets;
-using System.Text;
 using GhostGame.Shared;
-
-const PacketType EchoType = PacketType.Chat;
 
 var server = new IPEndPoint(
     args.Length > 0 ? IPAddress.Parse(args[0]) : IPAddress.Loopback,
@@ -17,116 +13,211 @@ var socketClient = new Socket(
 
 socketClient.Bind(new IPEndPoint(IPAddress.Any, 0));
 
-var buffer = new byte[PacketIO.ReceiveBufferSize];
-bool livereload = true;
+var transport = new Transport(socketClient);
+var channel = new ReliableChannel(transport, server);
+// приём идёт в фоне и складывает готовые пакеты сюда, главный поток их разбирает (ТЗ 5.3)
+var incoming = System.Threading.Channels.Channel.CreateUnbounded<Packet>();
+var myId = 0;
+var lastHeard = Environment.TickCount64; // когда последний раз что-то пришло от сервера
+var pingMs = -1L;
 
+_ = Task.Run(ReceiveLoopAsync);
+_ = Task.Run(ResendLoopAsync);
+
+// Рукопожатие: Hello → Welcome или Error, ждём не больше 5 секунд (ТЗ 5.3)
 while (true)
 {
     Console.Write("Ник: ");
     var nick = Console.ReadLine() ?? "";
-    await PacketIO.SendPacketAsync(socketClient, server, PacketType.Hello, 0, Packets.WriteHello(1, nick));
+    await channel.SendAsync(PacketType.Hello, Packets.WriteHello(1, nick));
 
-    using var helloTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+    var reply = await WaitForReplyAsync(TimeSpan.FromSeconds(5));
+    if (reply == null)
+    {
+        Console.WriteLine("Сервер не отвечает");
+        return;
+    }
+
     try
     {
-        var (reply, _) = await PacketIO.ReceivePacketAsync(socketClient, buffer, helloTimeout.Token);
-        if (reply == null)
-        {
-            Console.WriteLine("broken datagram from server");
-            continue;
-        }
-
         if (reply.Type == PacketType.Welcome)
         {
-            Console.WriteLine($"Подключено, ваш id: {Packets.ReadWelcome(reply.Payload)}");
+            myId = Packets.ReadWelcome(reply.Payload);
+            Console.WriteLine($"Подключено, ваш id: {myId}");
             break;
         }
 
-        if (reply.Type == PacketType.Error)
-        {
-            var (code, message) = Packets.ReadError(reply.Payload);
-            Console.WriteLine($"Ошибка {code}: {message}");
-            continue;
-        }
-
-        Console.WriteLine($"unexpected packet from server: {reply.Type}");
+        var (code, message) = Packets.ReadError(reply.Payload);
+        Console.WriteLine($"Ошибка {code}: {message}");
     }
     catch (MalformedPacketException e)
     {
         Console.WriteLine($"broken datagram from server: {e.Message}");
     }
-    catch (OperationCanceledException)
-    {
-        Console.WriteLine("Сервер не отвечает");
-        return;
-    }
-    catch (SocketException e) when (e.SocketErrorCode == SocketError.ConnectionReset)
-    {
-        Console.WriteLine("Сервер не отвечает");
-        return;
-    }
 }
 
-while (livereload)
+_ = Task.Run(PrintLoopAsync);
+_ = Task.Run(PingLoopAsync);
+Console.WriteLine("Пишите сообщения. /flood N — отправить N пронумерованных сообщений, /ping — пинг, exit — выход.");
+
+while (true)
 {
-    await HandleClientAsync(socketClient);
+    var line = Console.ReadLine();
+    if (line == null || line == "exit")
+    {
+        break;
+    }
+
+    if (line == "/ping")
+    {
+        Console.WriteLine(pingMs < 0 ? "пинг ещё не измерен" : $"пинг: {pingMs} мс");
+        continue;
+    }
+
+    if (line.StartsWith("/flood ") && int.TryParse(line[7..], out var count))
+    {
+        for (var i = 1; i <= count; i++)
+        {
+            await channel.SendAsync(PacketType.Chat, Packets.WriteChat($"msg {i}"));
+        }
+        continue;
+    }
+
+    if (line.Length > 0)
+    {
+        await channel.SendAsync(PacketType.Chat, Packets.WriteChat(line));
+    }
 }
 
+// перед выходом даём неподтверждённым сообщениям дойти (не дольше 3 с)
+for (var waited = 0; channel.PendingCount > 0 && waited < 3000; waited += 50)
+{
+    await Task.Delay(50);
+}
+
+// при закрытии 3 копии Disconnect: хотя бы одна должна дойти (ТЗ 3.7)
+for (var i = 0; i < 3; i++)
+{
+    await transport.SendUnreliableAsync(PacketType.ClientDisconnect, Array.Empty<byte>(), server);
+}
 socketClient.Close();
 
-async Task HandleClientAsync(Socket socketClient)
+async Task<Packet?> WaitForReplyAsync(TimeSpan timeout)
 {
-    var command = Console.ReadLine() ?? "exit";
-
-    if (command == "exit")
-    {
-        await PacketIO.SendPacketAsync(socketClient, server, EchoType, 0, Packets.WriteChat(command));
-        livereload = false;
-        return;
-    }
-
-    var bytesSent = await PacketIO.SendPacketAsync(socketClient, server, EchoType, 0, Packets.WriteChat(command));
-
-    Console.WriteLine($"send {bytesSent}");
-
-    using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+    using var cts = new CancellationTokenSource(timeout);
     try
     {
-        var (packet, _) = await PacketIO.ReceivePacketAsync(socketClient, buffer, timeout.Token);
-        if (packet == null)
+        while (true)
         {
-            Console.WriteLine("broken datagram from server");
-            return;
+            var packet = await incoming.Reader.ReadAsync(cts.Token);
+            if (packet.Type is PacketType.Welcome or PacketType.Error)
+            {
+                return packet;
+            }
         }
-        
-        if (packet.Type == PacketType.Error)
-        {
-            var (code, message) = Packets.ReadError(packet.Payload);
-            Console.WriteLine($"Ошибка {code}: {message}");
-            livereload = false;
-            return;
-        }
-
-        if (packet.Type == PacketType.ServerDisconnect)
-        {
-            Console.WriteLine($"Сервер отключил вас: {Packets.ReadServerDisconnect(packet.Payload)}");
-            livereload = false;
-            return;
-        }
-
-        Console.WriteLine(Packets.ReadChat(packet.Payload));
-    }
-    catch (MalformedPacketException e)
-    {
-        Console.WriteLine($"broken datagram from server: {e.Message}");
     }
     catch (OperationCanceledException)
     {
-        Console.WriteLine("no reply in 2 s (datagram lost?)");
-    }
-    catch (SocketException e) when (e.SocketErrorCode == SocketError.ConnectionReset)
-    {
-        Console.WriteLine($"server {server} is not running");
+        return null;
     }
 }
 
+async Task ReceiveLoopAsync()
+{
+    var buffer = new byte[PacketIO.ReceiveBufferSize];
+    while (true)
+    {
+        try
+        {
+            var (packet, from) = await PacketIO.ReceivePacketAsync(socketClient, buffer);
+            if (packet == null || !from.Equals(server))
+            {
+                continue;
+            }
+            lastHeard = Environment.TickCount64;
+
+            if (packet.Type == PacketType.Pong)
+            {
+                pingMs = Environment.TickCount64 - Packets.ReadPong(packet.Payload);
+                continue;
+            }
+
+            foreach (var ready in await channel.ReceiveAsync(packet))
+            {
+                incoming.Writer.TryWrite(ready);
+            }
+        }
+        catch (SocketException e) when (e.SocketErrorCode == SocketError.ConnectionReset)
+        {
+            // Windows так сообщает, что на порту сервера никто не слушает; рукопожатие скажет «Сервер не отвечает»
+        }
+        catch (MalformedPacketException e)
+        {
+            Console.WriteLine($"broken datagram from server: {e.Message}");
+        }
+        catch (ObjectDisposedException)
+        {
+            return;
+        }
+    }
+}
+
+async Task ResendLoopAsync()
+{
+    while (true)
+    {
+        await Task.Delay(50);
+        var (_, failed) = await channel.ResendAsync();
+        if (failed)
+        {
+            Console.WriteLine("Соединение потеряно: сервер не подтверждает пакеты");
+            Environment.Exit(1);
+        }
+    }
+}
+
+// Ping раз в секунду (ТЗ 3.4); нет ни одной датаграммы от сервера 5 с — соединение потеряно (ТЗ 5.3)
+async Task PingLoopAsync()
+{
+    while (true)
+    {
+        await transport.SendUnreliableAsync(PacketType.Ping, Packets.WritePing(Environment.TickCount64), server);
+        await Task.Delay(1000);
+        if (Environment.TickCount64 - lastHeard > 5000)
+        {
+            Console.WriteLine("Соединение потеряно");
+            Environment.Exit(1);
+        }
+    }
+}
+
+async Task PrintLoopAsync()
+{
+    await foreach (var packet in incoming.Reader.ReadAllAsync())
+    {
+        try
+        {
+            switch (packet.Type)
+            {
+                case PacketType.ChatMessage:
+                    var (playerId, text) = Packets.ReadChatMessage(packet.Payload);
+                    Console.WriteLine(playerId == myId ? $"[я] {text}" : $"[{playerId}] {text}");
+                    break;
+
+                case PacketType.Error:
+                    var (code, message) = Packets.ReadError(packet.Payload);
+                    Console.WriteLine($"Ошибка {code}: {message}");
+                    break;
+
+                case PacketType.ServerDisconnect:
+                    Console.WriteLine($"Сервер отключил вас: {Packets.ReadServerDisconnect(packet.Payload)}");
+                    Environment.Exit(0);
+                    break;
+            }
+        }
+        catch (MalformedPacketException e)
+        {
+            Console.WriteLine($"broken datagram from server: {e.Message}");
+        }
+    }
+}
