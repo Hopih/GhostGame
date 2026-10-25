@@ -167,7 +167,7 @@ public sealed class ReliableChannel
         {
             Datagram = datagram;
             FirstSentAt = sentAt;
-            LastSentAt = sentAt;
+            LastSentAt = sentAt; //???
         }
 
         public byte[] Datagram { get; }

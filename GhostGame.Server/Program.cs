@@ -20,6 +20,13 @@ var buffer = new byte[PacketIO.ReceiveBufferSize];
 // цикл приёма и фоновая задача работают параллельно, поэтому ConcurrentDictionary (ТЗ 4.1)
 var clients = new ConcurrentDictionary<IPEndPoint, ClientSession>();
 
+// Комнаты меняют и цикл приёма (JoinRoom…), и фоновая задача (таймаут игрока в комнате).
+// Поэтому весь доступ к rooms идёт только внутри roomsGate — по одному, и внутри можно await.
+var rooms = new Dictionary<int, Room>();
+var roomsGate = new SemaphoreSlim(1, 1);
+const int MaxClients = 40; // 8 комнат по 5 игроков (ТЗ 4)
+const int MaxRooms = 8;
+
 _ = Task.Run(MaintenanceLoopAsync);
 
 while (true)
@@ -74,6 +81,7 @@ async Task HandlePacketAsync(ClientSession session, IPEndPoint from, Packet pack
         if (clients.TryRemove(from, out _))
         {
             Console.WriteLine($"Игрок {session.Nick ?? from.ToString()} отключился (Disconnect)");
+            await RemoveFromRoomAsync(session);
         }
         return;
     }
@@ -100,13 +108,16 @@ async Task HandlePacketAsync(ClientSession session, IPEndPoint from, Packet pack
 
     switch (packet.Type)
     {
+        case PacketType.ListRooms:
+        case PacketType.CreateRoom:
+        case PacketType.JoinRoom:
+        case PacketType.LeaveRoom:
+        case PacketType.SetReady:
         case PacketType.Chat:
-            var text = Packets.ReadChat(packet.Payload);
-            Console.WriteLine($"[{from}] {session.Nick}: {text}");
-            foreach (var other in clients.Values.Where(c => c.IsJoined))
-            {
-                await other.Channel.SendAsync(PacketType.ChatMessage, Packets.WriteChatMessage(session.PlayerId, text));
-            }
+        case PacketType.GameStart:
+        case PacketType.RoomState:
+        case PacketType.RoomList:   
+            await HandleRoomPacketAsync(session, from, packet);
             break;
 
         default:
@@ -142,16 +153,171 @@ async Task HandleHelloAsync(ClientSession session, IPEndPoint from, Packet packe
         return;
     }
 
-    if (clients.Values.Count(s => s.IsJoined) >= 5)
+    if (clients.Values.Count(s => s.IsJoined) >= MaxClients)
     {
         await session.Channel.SendAsync(PacketType.Error,
-            Packets.WriteError(ErrorCode.RoomFull, "Комната заполнена"));
+            Packets.WriteError(ErrorCode.RoomFull, "Сервер заполнен"));
         return;
     }
 
     session.Join(nick);
     await session.Channel.SendAsync(PacketType.Welcome, Packets.WriteWelcome(session.PlayerId));
     Console.WriteLine($"[{from}] {nick} подключился, id {session.PlayerId}");
+}
+
+// Всё про комнаты: список, создание, вход, выход, готовность, чат комнаты (ТЗ 4.2)
+async Task HandleRoomPacketAsync(ClientSession session, IPEndPoint from, Packet packet)
+{
+    await roomsGate.WaitAsync();
+    try
+    {
+        rooms.TryGetValue(session.RoomId, out var room); // комната игрока или null, если он в лобби
+
+        switch (packet.Type)
+        {
+            case PacketType.ListRooms:
+                var infos = rooms.Values.Select(r => r.ToInfo()).ToList();
+                await session.Channel.SendAsync(PacketType.RoomList, Packets.WriteRoomList(infos));
+                break;
+
+            case PacketType.CreateRoom:
+                var name = Packets.ReadCreateRoom(packet.Payload);
+                if (room != null)
+                {
+                    await SendErrorAsync(session, ErrorCode.UnexpectedPacket, "Вы уже в комнате");
+                    break;
+                }
+                if (name.Length < 1 || name.Length > 24)
+                {
+                    await SendErrorAsync(session, ErrorCode.UnexpectedPacket, "Название комнаты — от 1 до 24 символов");
+                    break;
+                }
+                if (rooms.Count >= MaxRooms)
+                {
+                    await SendErrorAsync(session, ErrorCode.RoomFull, "Достигнут лимит комнат");
+                    break;
+                }
+                var created = new Room(name);
+                rooms[created.Id] = created;
+                created.Add(session);
+                Console.WriteLine($"[{from}] {session.Nick} создал комнату «{created.Name}» (id {created.Id})");
+                await created.BroadcastStateAsync();
+                break;
+
+            case PacketType.JoinRoom:
+                var roomId = Packets.ReadJoinRoom(packet.Payload);
+                if (room != null)
+                {
+                    await SendErrorAsync(session, ErrorCode.UnexpectedPacket, "Вы уже в комнате");
+                    break;
+                }
+                if (!rooms.TryGetValue(roomId, out var target))
+                {
+                    await SendErrorAsync(session, ErrorCode.RoomNotFound, "Комната не найдена");
+                    break;
+                }
+                if (target.IsFull)
+                {
+                    await SendErrorAsync(session, ErrorCode.RoomFull, "Комната заполнена");
+                    break;
+                }
+                if (target.InGame)
+                {
+                    await SendErrorAsync(session, ErrorCode.GameInProgress, "Игра уже идёт");
+                    break;
+                }
+                target.Add(session);
+                Console.WriteLine($"[{from}] {session.Nick} вошёл в комнату «{target.Name}»");
+                await target.BroadcastStateAsync();
+                break;
+
+            case PacketType.LeaveRoom:
+                if (room == null)
+                {
+                    await SendErrorAsync(session, ErrorCode.UnexpectedPacket, "Вы не в комнате");
+                    break;
+                }
+                await LeaveRoomAsync(session, room);
+                break;
+
+            case PacketType.SetReady:
+                var ready = Packets.ReadSetReady(packet.Payload);
+                if (room == null)
+                {
+                    await SendErrorAsync(session, ErrorCode.UnexpectedPacket, "Вы не в комнате");
+                    break;
+                }
+                if (room.InGame)
+                {
+                    await SendErrorAsync(session, ErrorCode.GameInProgress, "Игра уже идёт");
+                    break;
+                }
+                session.IsReady = ready;
+                await room.BroadcastStateAsync();
+                if (room.CanStart)
+                {
+                    var ghost = await room.StartGameAsync();
+                    Console.WriteLine($"Комната «{room.Name}»: раунд начался, призрак — {ghost.Nick}");
+                }
+                break;
+
+            case PacketType.Chat:
+                var text = Packets.ReadChat(packet.Payload);
+                if (room == null)
+                {
+                    await SendErrorAsync(session, ErrorCode.UnexpectedPacket, "Чат работает только в комнате");
+                    break;
+                }
+                Console.WriteLine($"[{from}] «{room.Name}» {session.Nick}: {text}");
+                await room.BroadcastAsync(PacketType.ChatMessage, Packets.WriteChatMessage(session.PlayerId, text));
+                break;
+            
+            case PacketType.GameStart:
+                var (role , roundSeconds , spawns) = Packets.ReadGameStart(packet.Payload);
+                await session.Channel.SendAsync(PacketType.ChatMessage, Packets.WriteChatMessage(session.PlayerId, $"Игра началась! Ваща роль {role}"));
+                break;
+        }
+    }
+    finally
+    {
+        roomsGate.Release(); // finally: даже если вылетело исключение, иначе комнаты встанут навсегда
+    }
+}
+
+// Выход из комнаты. Вызывать только внутри roomsGate.
+async Task LeaveRoomAsync(ClientSession session, Room room)
+{
+    room.Remove(session);
+    Console.WriteLine($"{session.Nick} вышел из комнаты «{room.Name}»");
+    if (room.IsEmpty)
+    {
+        rooms.Remove(room.Id);
+        Console.WriteLine($"Комната «{room.Name}» удалена");
+        return;
+    }
+    await room.BroadcastStateAsync();
+}
+
+// Игрок отключился (Disconnect или таймаут) — убрать его из комнаты, если он в ней был
+async Task RemoveFromRoomAsync(ClientSession session)
+{
+    await roomsGate.WaitAsync();
+    try
+    {
+        if (rooms.TryGetValue(session.RoomId, out var room))
+        {
+            await LeaveRoomAsync(session, room);
+        }
+    }
+    finally
+    {
+        roomsGate.Release();
+    }
+}
+
+Task SendErrorAsync(ClientSession session, ErrorCode code, string message)
+{
+    return session.Channel.SendAsync(PacketType.Error, Packets.WriteError(code, message));
 }
 
 // Фоновая задача раз в 50 мс (ТЗ 4.1): повторы надёжного канала и таймауты сессий
@@ -171,6 +337,7 @@ async Task MaintenanceLoopAsync()
                 }
 
                 var silent = Environment.TickCount64 - session.LastPing > 10_000;
+                
                 if ((failed || silent) && clients.TryRemove(endpoint, out _))
                 {
                     var reason = failed ? "нет подтверждений 10 с" : "таймаут";
@@ -180,6 +347,7 @@ async Task MaintenanceLoopAsync()
                         await transport.SendUnreliableAsync(PacketType.ServerDisconnect,
                             Packets.WriteServerDisconnect(DisconnectReason.Timeout), endpoint);
                     }
+                    await RemoveFromRoomAsync(session);
                 }
             }
             catch (Exception e)

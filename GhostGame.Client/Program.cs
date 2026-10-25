@@ -1,5 +1,6 @@
 ﻿using System.Net;
 using System.Net.Sockets;
+using System.Text;
 using GhostGame.Shared;
 
 var server = new IPEndPoint(
@@ -18,6 +19,7 @@ var channel = new ReliableChannel(transport, server);
 // приём идёт в фоне и складывает готовые пакеты сюда, главный поток их разбирает (ТЗ 5.3)
 var incoming = System.Threading.Channels.Channel.CreateUnbounded<Packet>();
 var myId = 0;
+var myready = false;
 var lastHeard = Environment.TickCount64; // когда последний раз что-то пришло от сервера
 var pingMs = -1L;
 
@@ -81,6 +83,38 @@ while (true)
             await channel.SendAsync(PacketType.Chat, Packets.WriteChat($"msg {i}"));
         }
         continue;
+    }
+
+    if (line == "/rooms")
+    {
+        await channel.SendAsync(PacketType.ListRooms, Array.Empty<byte>());
+        continue;
+    }
+
+    if (line.StartsWith("/create"))
+    {
+        var roomName = line.Split(' ')[1];
+        await channel.SendAsync(PacketType.CreateRoom, Packets.WriteCreateRoom(roomName));
+        continue;
+    }
+
+    if (line.StartsWith("/join"))
+    {
+        var roomId = int.Parse(line.Split(' ')[1]);
+        await channel.SendAsync(PacketType.JoinRoom, Packets.WriteJoinRoom(roomId));
+        continue;   
+    }
+
+    if (line.StartsWith("/ready"))
+    {
+        await channel.SendAsync(PacketType.SetReady, Packets.WriteSetReady(!myready));
+        continue;  
+    }
+
+    if (line.StartsWith("/leave"))
+    {
+        await channel.SendAsync(PacketType.LeaveRoom, Array.Empty<byte>());
+        continue; 
     }
 
     if (line.Length > 0)
