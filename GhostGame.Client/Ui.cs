@@ -27,7 +27,7 @@ public static class Ui
     {
         var codepoints = Enumerable.Range(32, 95)                 // пробел, латиница, цифры, знаки
             .Concat(Enumerable.Range(0x400, 0x60))               // кириллица: А–я, Ё, ё
-            .Concat("«»—–…№".Select(c => (int)c))
+            .Concat("«»—–…№·".Select(c => (int)c))
             .ToArray();
 
         foreach (var path in new[] { @"C:\Windows\Fonts\segoeui.ttf", @"C:\Windows\Fonts\arial.ttf", @"C:\Windows\Fonts\tahoma.ttf" })
