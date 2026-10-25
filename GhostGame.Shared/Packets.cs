@@ -112,15 +112,15 @@ public static class Packets
         r.EnsureEnd();
         return roomId;
     }
-    
+
     // SetReady полей не имеет: сервер сам переключает готовность (ТЗ 3.4)
 
     // RoomList: список из (roomId: int, name: string, players: byte, maxPlayers: byte, inGame: bool) (ТЗ 3.5)
     public static byte[] WriteRoomList(List<RoomInfo> rooms)
     {
         var w = new PacketWriter();
-        w.WriteByte((byte)rooms.Count);          // список: сначала количество
-        foreach (var room in rooms)              // потом элементы подряд
+        w.WriteByte((byte)rooms.Count); // список: сначала количество
+        foreach (var room in rooms) // потом элементы подряд
         {
             w.WriteInt(room.RoomId);
             w.WriteString(room.Name);
@@ -128,6 +128,7 @@ public static class Packets
             w.WriteByte(room.MaxPlayers);
             w.WriteBool(room.InGame);
         }
+
         return w.ToArray();
     }
 
@@ -145,6 +146,7 @@ public static class Packets
             var inGame = r.ReadBool();
             rooms.Add(new RoomInfo(roomId, name, players, maxPlayers, inGame));
         }
+
         r.EnsureEnd();
         return rooms;
     }
@@ -163,6 +165,7 @@ public static class Packets
             w.WriteString(player.Nick);
             w.WriteBool(player.Ready);
         }
+
         return w.ToArray();
     }
 
@@ -181,6 +184,7 @@ public static class Packets
             var ready = r.ReadBool();
             players.Add(new RoomPlayer(playerId, nick, ready));
         }
+
         r.EnsureEnd();
         return (roomId, name, hostId, players);
     }
@@ -198,6 +202,7 @@ public static class Packets
             w.WriteFloat(spawn.X);
             w.WriteFloat(spawn.Y);
         }
+
         return w.ToArray();
     }
 
@@ -215,6 +220,7 @@ public static class Packets
             var y = r.ReadFloat();
             spawns.Add(new PlayerSpawn(playerId, x, y));
         }
+
         r.EnsureEnd();
         return (role, roundSeconds, spawns);
     }
@@ -286,4 +292,73 @@ public static class Packets
         r.EnsureEnd();
         return (code, message);
     }
-}
+
+    // Input: inputSeq: uint, moveX: sbyte, moveY: sbyte, aimX: float, aimY: float, actions: byte (ТЗ 3.4)
+    public static byte[] WriteInput(uint inputSeq, InputState input)
+    {
+        var w = new PacketWriter();
+        w.WriteUInt(inputSeq); // 4 байта — номер пакета
+        w.WriteSByte(input.MoveX); // 1 байт  — −1 / 0 / 1
+        w.WriteSByte(input.MoveY); // 1 байт  — −1 / 0 / 1
+        w.WriteFloat(input.AimX); // 4 байта — прицел X
+        w.WriteFloat(input.AimY); // 4 байта — прицел Y
+        w.WriteByte(input.Actions); // 1 байт  — кнопки
+        return w.ToArray(); // 15 байт
+    }
+
+    public static (uint InputSeq, InputState Input) ReadInput(byte[] payload)
+    {
+        var r = new PacketReader(payload);
+        var inputSeq = r.ReadUInt();   // те же 6 полей, в том же порядке, что в WriteInput
+        var moveX = r.ReadSByte();
+        var moveY = r.ReadSByte();
+        var aimX = r.ReadFloat();
+        var aimY = r.ReadFloat();
+        var actions = r.ReadByte();
+        r.EnsureEnd();
+        return (inputSeq, new InputState(moveX, moveY, aimX, aimY, actions));
+    }
+
+    // Snapshot: tick: uint, timeLeft: ushort, список из (playerId: int, x, y, aimX, aimY: float, flags: byte),
+    // curseMask: byte (ТЗ 3.5). Число игроков оказывается в датаграмме по смещению 13: заголовок 7 + tick 4 + timeLeft 2.
+    public static byte[] WriteSnapshot(Snapshot snapshot)
+    {
+        var w = new PacketWriter();
+        w.WriteUInt(snapshot.Tick);
+        w.WriteUShort(snapshot.TimeLeft);
+        w.WriteByte((byte)snapshot.Players.Count); // список: сначала количество
+        foreach (var p in snapshot.Players)        // потом игроки подряд, по 21 байту
+        {
+            w.WriteInt(p.PlayerId);
+            w.WriteFloat(p.X);
+            w.WriteFloat(p.Y);
+            w.WriteFloat(p.AimX);
+            w.WriteFloat(p.AimY);
+            w.WriteByte(p.Flags);
+        }
+        w.WriteByte(snapshot.CurseMask);            // маска — после списка
+        return w.ToArray();
+    }
+
+    public static Snapshot ReadSnapshot(byte[] payload)
+    {
+        var r = new PacketReader(payload);
+        var tick = r.ReadUInt();
+        var timeLeft = r.ReadUShort();
+        var count = r.ReadByte();
+        var players = new List<SnapshotPlayer>();
+        for (var i = 0; i < count; i++)
+        {
+            var playerId = r.ReadInt();
+            var x = r.ReadFloat();
+            var y = r.ReadFloat();
+            var aimX = r.ReadFloat();
+            var aimY = r.ReadFloat();
+            var flags = r.ReadByte();
+            players.Add(new SnapshotPlayer(playerId, x, y, aimX, aimY, flags));
+        }
+        var curseMask = r.ReadByte();
+        r.EnsureEnd();
+        return new Snapshot(tick, timeLeft, players, curseMask);
+    }
+}    
