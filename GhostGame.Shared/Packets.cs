@@ -112,22 +112,8 @@ public static class Packets
         r.EnsureEnd();
         return roomId;
     }
-
-    // SetReady: ready: bool (ТЗ 3.4)
-    public static byte[] WriteSetReady(bool ready)
-    {
-        var w = new PacketWriter();
-        w.WriteBool(ready);
-        return w.ToArray();
-    }
-
-    public static bool ReadSetReady(byte[] payload)
-    {
-        var r = new PacketReader(payload);
-        var ready = r.ReadBool();
-        r.EnsureEnd();
-        return ready;
-    }
+    
+    // SetReady полей не имеет: сервер сам переключает готовность (ТЗ 3.4)
 
     // RoomList: список из (roomId: int, name: string, players: byte, maxPlayers: byte, inGame: bool) (ТЗ 3.5)
     public static byte[] WriteRoomList(List<RoomInfo> rooms)

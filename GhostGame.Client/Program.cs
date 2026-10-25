@@ -1,6 +1,5 @@
 ﻿using System.Net;
 using System.Net.Sockets;
-using System.Text;
 using GhostGame.Shared;
 
 var server = new IPEndPoint(
@@ -19,7 +18,7 @@ var channel = new ReliableChannel(transport, server);
 // приём идёт в фоне и складывает готовые пакеты сюда, главный поток их разбирает (ТЗ 5.3)
 var incoming = System.Threading.Channels.Channel.CreateUnbounded<Packet>();
 var myId = 0;
-var myready = false;
+string? myRoom = null; // название моей комнаты: берём из RoomState, сбрасываем при /leave
 var lastHeard = Environment.TickCount64; // когда последний раз что-то пришло от сервера
 var pingMs = -1L;
 
@@ -60,7 +59,8 @@ while (true)
 
 _ = Task.Run(PrintLoopAsync);
 _ = Task.Run(PingLoopAsync);
-Console.WriteLine("Пишите сообщения. /flood N — отправить N пронумерованных сообщений, /ping — пинг, exit — выход.");
+Console.WriteLine("Команды: /rooms — список комнат, /create <название>, /join <номер>, /leave, /ready — готов / не готов, /ping.");
+Console.WriteLine("Любой другой текст — сообщение в чат комнаты. exit — выход.");
 
 while (true)
 {
@@ -93,28 +93,45 @@ while (true)
 
     if (line.StartsWith("/create"))
     {
-        var roomName = line.Split(' ')[1];
+        var roomName = line.Substring("/create".Length).Trim(); // всё после команды, с пробелами внутри
+        if (roomName.Length == 0)
+        {
+            Console.WriteLine("Использование: /create <название>");
+            continue;
+        }
         await channel.SendAsync(PacketType.CreateRoom, Packets.WriteCreateRoom(roomName));
         continue;
     }
 
     if (line.StartsWith("/join"))
     {
-        var roomId = int.Parse(line.Split(' ')[1]);
+        if (!int.TryParse(line.Substring("/join".Length).Trim(), out var roomId))
+        {
+            Console.WriteLine("Использование: /join <номер> (номера комнат — в /rooms)");
+            continue;
+        }
         await channel.SendAsync(PacketType.JoinRoom, Packets.WriteJoinRoom(roomId));
-        continue;   
+        continue;
     }
 
     if (line.StartsWith("/ready"))
     {
-        await channel.SendAsync(PacketType.SetReady, Packets.WriteSetReady(!myready));
+        await channel.SendAsync(PacketType.SetReady, Array.Empty<byte>());
         continue;  
     }
 
     if (line.StartsWith("/leave"))
     {
+        if (myRoom == null)
+        {
+            Console.WriteLine("Вы не в комнате");
+            continue;
+        }
         await channel.SendAsync(PacketType.LeaveRoom, Array.Empty<byte>());
-        continue; 
+        // выходящему сервер RoomState не присылает — он уже не в комнате, поэтому пишем сами
+        Console.WriteLine($"Вы вышли из комнаты «{myRoom}»");
+        myRoom = null;
+        continue;
     }
 
     if (line.Length > 0)
@@ -246,6 +263,38 @@ async Task PrintLoopAsync()
                 case PacketType.ServerDisconnect:
                     Console.WriteLine($"Сервер отключил вас: {Packets.ReadServerDisconnect(packet.Payload)}");
                     Environment.Exit(0);
+                    break;
+                
+                case PacketType.RoomList:
+                    var infos = Packets.ReadRoomList(packet.Payload);
+                    if (infos.Count == 0)
+                    {
+                        Console.WriteLine("Комнат нет. Создайте: /create <название>");
+                        break;
+                    }
+                    Console.WriteLine("Комнаты:");
+                    foreach (var info in infos)
+                    {
+                        var inGame = info.InGame ? ", идёт игра" : "";
+                        Console.WriteLine($"[{info.RoomId}] {info.Name} ({info.Players}/{info.MaxPlayers}{inGame})");
+                    }
+                    break;
+
+                case PacketType.RoomState:
+                    var state = Packets.ReadRoomState(packet.Payload);
+                    myRoom = state.Name;
+                    var host = state.Players.FirstOrDefault(p => p.PlayerId == state.HostId)?.Nick;
+                    Console.WriteLine($"Комната «{state.Name}», хост: {host}");
+                    foreach (var player in state.Players)
+                    {
+                        var me = player.PlayerId == myId ? " (вы)" : "";
+                        Console.WriteLine($"  {(player.Ready ? "[*]" : "[ ]")} {player.Nick}{me}");
+                    }
+                    break;
+
+                case PacketType.GameStart:
+                    var role = Packets.ReadGameStart(packet.Payload).Role;
+                    Console.WriteLine($"Игра началась! Вы — {(role == Role.Ghost ? "призрак" : "охотник")}");
                     break;
             }
         }

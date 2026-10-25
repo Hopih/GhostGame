@@ -114,9 +114,6 @@ async Task HandlePacketAsync(ClientSession session, IPEndPoint from, Packet pack
         case PacketType.LeaveRoom:
         case PacketType.SetReady:
         case PacketType.Chat:
-        case PacketType.GameStart:
-        case PacketType.RoomState:
-        case PacketType.RoomList:   
             await HandleRoomPacketAsync(session, from, packet);
             break;
 
@@ -241,7 +238,6 @@ async Task HandleRoomPacketAsync(ClientSession session, IPEndPoint from, Packet 
                 break;
 
             case PacketType.SetReady:
-                var ready = Packets.ReadSetReady(packet.Payload);
                 if (room == null)
                 {
                     await SendErrorAsync(session, ErrorCode.UnexpectedPacket, "Вы не в комнате");
@@ -252,7 +248,7 @@ async Task HandleRoomPacketAsync(ClientSession session, IPEndPoint from, Packet 
                     await SendErrorAsync(session, ErrorCode.GameInProgress, "Игра уже идёт");
                     break;
                 }
-                session.IsReady = ready;
+                session.IsReady = !session.IsReady;
                 await room.BroadcastStateAsync();
                 if (room.CanStart)
                 {
@@ -270,11 +266,6 @@ async Task HandleRoomPacketAsync(ClientSession session, IPEndPoint from, Packet 
                 }
                 Console.WriteLine($"[{from}] «{room.Name}» {session.Nick}: {text}");
                 await room.BroadcastAsync(PacketType.ChatMessage, Packets.WriteChatMessage(session.PlayerId, text));
-                break;
-            
-            case PacketType.GameStart:
-                var (role , roundSeconds , spawns) = Packets.ReadGameStart(packet.Payload);
-                await session.Channel.SendAsync(PacketType.ChatMessage, Packets.WriteChatMessage(session.PlayerId, $"Игра началась! Ваща роль {role}"));
                 break;
         }
     }
