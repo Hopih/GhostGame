@@ -23,6 +23,7 @@ var clients = new ConcurrentDictionary<IPEndPoint, ClientSession>();
 // Комнаты меняют и цикл приёма (JoinRoom…), и фоновая задача (таймаут игрока в комнате).
 // Поэтому весь доступ к rooms идёт только внутри roomsGate — по одному, и внутри можно await.
 var rooms = new Dictionary<int, Room>();
+var map = GameMap.Load();
 var roomsGate = new SemaphoreSlim(1, 1);
 const int MaxClients = 40; // 8 комнат по 5 игроков (ТЗ 4)
 const int MaxRooms = 8;
@@ -48,7 +49,7 @@ while (true)
                 // незнакомый адрес и не Hello — молча отбрасываем (ТЗ 4.5)
                 continue;
             }
-            session = clients.GetOrAdd(from, endpoint => new ClientSession(new ReliableChannel(transport, endpoint)));
+            session = clients.GetOrAdd(from, endpoint => new ClientSession(new ReliableChannel(transport, endpoint) , endpoint));
         }
         session.LastPing = Environment.TickCount64; //храним последнее время ответа
 
@@ -252,7 +253,7 @@ async Task HandleRoomPacketAsync(ClientSession session, IPEndPoint from, Packet 
                 await room.BroadcastStateAsync();
                 if (room.CanStart)
                 {
-                    var ghost = await room.StartGameAsync();
+                    var ghost = await room.StartGameAsync(map);
                     Console.WriteLine($"Комната «{room.Name}»: раунд начался, призрак — {ghost.Nick}");
                 }
                 break;

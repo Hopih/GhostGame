@@ -1,5 +1,5 @@
 ﻿using GhostGame.Shared;
-
+using System.Net;
 namespace GhostGame.Server;
 
 // Сессия создаётся на первый Hello с нового адреса, игроком становится после принятого Hello (Join)
@@ -7,9 +7,10 @@ public class ClientSession
 {
     private static int nextPlayerId = 1;
 
-    public ClientSession(ReliableChannel channel)
+    public ClientSession(ReliableChannel channel , IPEndPoint endPoint)
     {
         Channel = channel;
+        EndPoint = endPoint;
         LastPing = Environment.TickCount64;
     }
 
@@ -20,6 +21,8 @@ public class ClientSession
     public int PlayerId { get; private set; }
 
     public bool IsJoined => Nick != null;
+    
+    public IPEndPoint EndPoint { get; }
 
     public int RoomId { get; set; } = -1;
 

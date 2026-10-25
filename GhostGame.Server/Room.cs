@@ -25,6 +25,9 @@ public class Room
     // игроки комнаты: ключ — playerId
     public Dictionary<int, ClientSession> Players { get; } = new();
 
+    // состояния игроков в текущем раунде: ключ — playerId; пусто, пока раунд не идёт
+    public Dictionary<int, PlayerState> Round { get; } = new();
+
     public bool IsFull => Players.Count >= MaxPlayers;
     public bool IsEmpty => Players.Count == 0;
     public bool CanStart => !InGame && Players.Count >= MinPlayersToStart && Players.Values.All(p => p.IsReady);
@@ -74,13 +77,27 @@ public class Room
     }
 
     // Старт раунда: случайный призрак, каждому свой GameStart со своей ролью (ТЗ 4.2)
-    public async Task<ClientSession> StartGameAsync()
+    public async Task<ClientSession> StartGameAsync(GameMap map)
     {
         InGame = true;
         var players = Players.Values.ToList();
         var ghost = players[Random.Shared.Next(players.Count)];
         // точки появления пока (0, 0) — настоящие будут на этапе 5 вместе с картой
-        var spawns = players.Select(p => new PlayerSpawn(p.PlayerId, 0, 0)).ToList();
+        var ghostPosition = players.Where(p => p.PlayerId == ghost.PlayerId)
+            .Select(p => new PlayerSpawn(p.PlayerId,map.GhostSpawn.X, map.GhostSpawn.Y)).ToList();
+        
+        var huntersPosition = players.Where(p => p.PlayerId != ghost.PlayerId).Select((p,i )
+            => new PlayerSpawn(p.PlayerId, map.HunterSpawns[i].X , map.HunterSpawns[i].Y )).ToList();
+        
+        var spawns = ghostPosition.Concat(huntersPosition).ToList();
+        
+        Round.Clear();
+        foreach (var s in spawns)
+        {
+            var role = s.PlayerId == ghost.PlayerId ? Role.Ghost : Role.Hunter;
+            Round[s.PlayerId] = new PlayerState(Players[s.PlayerId], role, s.X, s.Y);
+        }
+        
         foreach (var player in players)
         {
             var role = player == ghost ? Role.Ghost : Role.Hunter;
