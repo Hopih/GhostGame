@@ -87,6 +87,15 @@ async Task HandlePacketAsync(ClientSession session, IPEndPoint from, Packet pack
         return;
     }
 
+    if (packet.Type == PacketType.ServerDisconnect)
+    {
+        foreach (var player in clients)
+        {
+            await RemoveFromRoomAsync(player.Value);
+        }
+        return;
+    }
+
     if (packet.Type == PacketType.Ping)
     {
         // Ping ходит на любом этапе и заодно не даёт сессии истечь (ТЗ 3.7)

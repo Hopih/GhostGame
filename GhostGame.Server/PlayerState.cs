@@ -31,6 +31,9 @@ public class PlayerState
     // когда пришёл последний Input: дольше 500 мс без Input — игрок стоит на месте (ТЗ 4.3)
     public long LastInputAt { get; set; }
 
+    // горит ли фонарь в этом тике: охотник держит ЛКМ (с учётом таймаута 500 мс); ставит игровой цикл
+    public bool FlashlightOn { get; set; }
+
     // клеток в секунду (ТЗ 4.3)
     public float Speed => Role == Role.Ghost ? 4.5f : 4f;
 }

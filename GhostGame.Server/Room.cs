@@ -1,5 +1,5 @@
 ﻿using GhostGame.Shared;
-
+using System.Numerics;
 namespace GhostGame.Server;
 
 // Комната: свои игроки и всё, что с ними происходит — вход, выход, хост, готовность, рассылки, старт раунда
@@ -146,9 +146,10 @@ public class Room
     {
         const float TickSeconds = 0.05f;   // длина тика: 20 тиков в секунду
         const float PlayerRadius = 0.35f;  // «толщина» игрока для стен — такая же, как рисует клиент
-
+        
         uint tick = 0;
         var endAt = Environment.TickCount64 + RoundSeconds * 1000L; // когда раунд закончится
+        
         while (InGame)
         {
             await Task.Delay(50);
@@ -172,32 +173,56 @@ public class Room
                     {
                         step *= 0.7071f; // по диагонали не быстрее, чем по прямой (1/√2)
                     }
-                    
+
                     var newX = player.X + input.MoveX * step;
                     if (map.CanStandAt(newX, player.Y, PlayerRadius))
                     {
                         player.X = newX;
                     }
+
                     var newY = player.Y + input.MoveY * step;
                     if (map.CanStandAt(player.X, newY, PlayerRadius))
                     {
                         player.Y = newY;
                     }
-                    
-                    var flags = player.Role == Role.Hunter && input.Primary ? SnapshotPlayer.FlagFlashlight : (byte)0;
-      
+
+                    player.FlashlightOn = player.Role == Role.Hunter && input.Primary;
+                    var flags = player.FlashlightOn ? SnapshotPlayer.FlagFlashlight : (byte)0;
+
                     snapshots.Add(new SnapshotPlayer(player.Session.PlayerId, player.X, player.Y,
                         player.Input.AimX, player.Input.AimY, flags));
                 }
+
                 recipients = Round.Values.ToList(); // кому слать — копия, чтобы не трогать Round вне замка
             }
 
+            // виден ли призрак хоть одному охотнику — одно значение на весь тик, после того как все сдвинулись
+            var ghost = Round.Values.FirstOrDefault(p => p.Role == Role.Ghost);
+  
+            var ghostVisible = ghost != null && Round.Values.Any(p => p.FlashlightOn && GhostVisionCheck(map, p.X, p.Y, p.Input.AimX, p.Input.AimY, ghost.X, ghost.Y));
+            var huntersView = snapshots.Where(x => x.PlayerId != ghost.Session.PlayerId).ToList();
             // этап 2: один снимок на всех; этап 3: каждому, включая самого игрока
-            var snapshot = new Snapshot(tick, timeLeft, snapshots, 0);
+            Snapshot snapshot;
+            if (ghostVisible)
+            {
+                snapshot = new Snapshot(tick, timeLeft, snapshots, 0);
+            }
+            else
+            {
+                snapshot = new Snapshot(tick, timeLeft, huntersView, 0);
+            }
+            
             foreach (var player in recipients)
             {
-                await transport.SendUnreliableAsync(PacketType.Snapshot, Packets.WriteSnapshot(snapshot),
-                    player.Session.EndPoint);
+                if (player.Role == Role.Ghost)
+                {
+                    await transport.SendUnreliableAsync(PacketType.Snapshot , Packets.WriteSnapshot(new Snapshot(tick, timeLeft, snapshots, 0)),player.Session.EndPoint);
+                }
+                else
+                {
+                    await transport.SendUnreliableAsync(PacketType.Snapshot, Packets.WriteSnapshot(snapshot),
+                        player.Session.EndPoint);
+                }
             }
 
             if (msLeft == 0)
@@ -207,5 +232,15 @@ public class Room
             }
         }
     }
+    public bool GhostVisionCheck(GameMap map, float posX, float posY, float aimX , float aimY , float ghostX , float ghostY)
+    {
+        var playerVector = new Vector2(posX, posY);
+        var aimVector = new Vector2(aimX, aimY);
+        var ghost = new Vector2(ghostX, ghostY);
+        
+        return (Flashlight.Covers(map, playerVector, aimVector, ghost));
+    }
 }
+
+
 
