@@ -81,7 +81,7 @@ public class Room
     }
 
     // Старт раунда: случайный призрак, каждому свой GameStart со своей ролью (ТЗ 4.2)
-    public async Task<ClientSession> StartGameAsync(GameMap map)
+    public async Task<ClientSession> StartGameAsync(GameMap map , Transport transport)
     {
         InGame = true;
         var players = Players.Values.ToList();
@@ -109,6 +109,11 @@ public class Room
             var role = player == ghost ? Role.Ghost : Role.Hunter;
             await player.Channel.SendAsync(PacketType.GameStart, Packets.WriteGameStart(role, RoundSeconds, spawns));
         }
+
+        _ = Task.Run((()
+            => GameLoopAsync(map, transport)));
+        
+            
         return ghost;
     }
 
@@ -134,4 +139,37 @@ public class Room
             player.LastInputAt = Environment.TickCount64;
         }
     }
+
+    public async Task GameLoopAsync(GameMap map, Transport transport)
+    {
+        uint tick = 0;
+        while (InGame)                                     // (2) крутимся весь раунд, а не один раз
+        {
+            await Task.Delay(50);                          // (2) 20 тиков в секунду, без блокировки потока
+            tick++;
+
+            var snapshots = new List<SnapshotPlayer>();    // новый список на каждый тик
+            List<PlayerState> recipients;
+            lock (roundLock)
+            {
+                foreach (var player in Round.Values)       // (4) этап 1: сдвинуть всех и собрать список
+                {
+                    var input = player.Input;              // (1) Input не стираем — нажатие держится до нового
+                    player.X += input.MoveX * player.Speed * 0.05f;   // (3) скорость в секунду × 0.05 с
+                    player.Y += input.MoveY * player.Speed * 0.05f;
+                    var snapshotPlayer = new SnapshotPlayer(player.Session.PlayerId, player.X, player.Y, input.AimX, input.AimY, 0);
+                    snapshots.Add(snapshotPlayer);
+                }
+                recipients = Round.Values.ToList();         // кому слать — копия, чтобы не трогать Round вне замка
+            }
+
+            var snapshot = new Snapshot(tick, RoundSeconds, snapshots, 0);   // (4) этап 2: один снимок на всех
+            foreach (var player in recipients)                              // (4) этап 3: каждому, включая самого игрока
+            {
+                await transport.SendUnreliableAsync(PacketType.Snapshot, Packets.WriteSnapshot(snapshot),
+                    player.Session.EndPoint);
+            }
+        }
+    }
 }
+

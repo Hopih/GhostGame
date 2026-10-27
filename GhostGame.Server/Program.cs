@@ -270,7 +270,7 @@ async Task HandleRoomPacketAsync(ClientSession session, IPEndPoint from, Packet 
                 await room.BroadcastStateAsync();
                 if (room.CanStart)
                 {
-                    var ghost = await room.StartGameAsync(map);
+                    var ghost = await room.StartGameAsync(map , transport);
                     Console.WriteLine($"Комната «{room.Name}»: раунд начался, призрак — {ghost.Nick}");
                 }
                 break;
