@@ -1,21 +1,13 @@
 using System.Numerics;
 using Raylib_cs;
 
-namespace GhostGame.Client;
+namespace GhostGame.Client.Graphics;
 
 // Простейший интерфейс поверх Raylib-cs: шрифт с кириллицей, текст, кнопка, поле ввода.
 // Всё рисуется заново каждый кадр между BeginDrawing и EndDrawing. Поэтому
 // if (Ui.Button(...)) { ... } одновременно рисует кнопку и сообщает, что по ней кликнули в этом кадре.
 public static class Ui
 {
-    public static readonly Color Background = new(24, 24, 32, 255);
-    public static readonly Color Panel = new(44, 44, 58, 255);
-    public static readonly Color PanelHover = new(64, 64, 84, 255);
-    public static readonly Color Accent = new(120, 160, 255, 255);
-    public static readonly Color TextColor = new(230, 230, 240, 255);
-    public static readonly Color Muted = new(150, 150, 165, 255);
-    public static readonly Color ErrorColor = new(255, 110, 110, 255);
-
     private const float Spacing = 1f;
 
     public static Font Font { get; private set; }
@@ -44,7 +36,7 @@ public static class Ui
 
     public static void Text(string text, float x, float y, float size = 22, Color? color = null)
     {
-        Raylib.DrawTextEx(Font, text, new Vector2(x, y), size, Spacing, color ?? TextColor);
+        Raylib.DrawTextEx(Font, text, new Vector2(x, y), size, Spacing, color ?? Theme.Text);
     }
 
     public static float MeasureText(string text, float size = 22)
@@ -57,12 +49,18 @@ public static class Ui
     public static bool Button(Rectangle bounds, string label, float size = 22, bool enabled = true)
     {
         var hover = enabled && Raylib.CheckCollisionPointRec(Raylib.GetMousePosition(), bounds);
-        Raylib.DrawRectangleRec(bounds, hover ? PanelHover : Panel);
-        Raylib.DrawRectangleLinesEx(bounds, 2, enabled ? Accent : Muted);
+        Raylib.DrawRectangleRec(bounds, hover ? Theme.PanelHover : Theme.Panel);
+        Raylib.DrawRectangleLinesEx(bounds, 2, enabled ? Theme.Accent : Theme.Muted);
         var textWidth = MeasureText(label, size);
         Text(label, bounds.X + (bounds.Width - textWidth) / 2, bounds.Y + (bounds.Height - size) / 2, size,
-            enabled ? TextColor : Muted);
+            enabled ? Theme.Text : Theme.Muted);
         return hover && Raylib.IsMouseButtonPressed(MouseButton.Left);
+    }
+
+    // Строка статуса внизу экрана: ошибки красным, остальное серым
+    public static void StatusLine(string text, bool isError)
+    {
+        Text(text, 40, 750, 22, isError ? Theme.Error : Theme.Muted);
     }
 }
 
@@ -116,13 +114,13 @@ public sealed class TextInput
             }
         }
 
-        Raylib.DrawRectangleRec(bounds, Ui.Panel);
-        Raylib.DrawRectangleLinesEx(bounds, 2, Focused ? Ui.Accent : Ui.Muted);
+        Raylib.DrawRectangleRec(bounds, Theme.Panel);
+        Raylib.DrawRectangleLinesEx(bounds, 2, Focused ? Theme.Accent : Theme.Muted);
 
         var textY = bounds.Y + (bounds.Height - size) / 2;
         if (Text.Length == 0 && !Focused)
         {
-            Ui.Text(placeholder, bounds.X + 10, textY, size, Ui.Muted);
+            Ui.Text(placeholder, bounds.X + 10, textY, size, Theme.Muted);
         }
         else
         {

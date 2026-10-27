@@ -1,4 +1,5 @@
 using System.Numerics;
+using GhostGame.Client.Graphics;
 using GhostGame.Shared;
 using Raylib_cs;
 
@@ -10,7 +11,7 @@ namespace GhostGame.Client;
 // Как пользоваться (создать на GameStart, дальше каждый кадр):
 //   game.ApplySnapshot(snapshot)  — когда пришёл Snapshot
 //   var input = game.ReadInput()  — что нажато сейчас; отправлять Input 20 раз в секунду
-//   game.Draw()                   — между BeginDrawing и EndDrawing
+//   game.Draw()                   — между BeginDrawing и EndDrawing; true — после конца раунда нажали «В комнату»
 public sealed class GameScreen
 {
     public const int Cell = 40;                 // 1280 / 32 = 800 / 20 = 40 пикселей на клетку
@@ -62,9 +63,6 @@ public sealed class GameScreen
 
     public Role MyRole => myRole;
 
-    // сколько секунд осталось по последнему Snapshot; 0 — время раунда вышло
-    public ushort TimeLeft => snapshot.TimeLeft;
-
     // ТЗ 5.3: Snapshot применяется, только если его tick больше последнего применённого.
     // Опоздавший или повторный Snapshot просто отбрасывается. Возвращает true, если снимок применён.
     public bool ApplySnapshot(Snapshot next)
@@ -92,13 +90,22 @@ public sealed class GameScreen
         return new InputState(moveX, moveY, mouse.X / Cell, mouse.Y / Cell, actions);
     }
 
-    public void Draw()
+    // Возвращает true, когда время раунда вышло и нажали «В комнату»
+    public bool Draw()
     {
         DrawMap();
         DrawItems();
         DrawBeams();
         DrawPlayers();
         DrawHud();
+        return snapshot.TimeLeft == 0 && DrawRoundOver();
+    }
+
+    private static bool DrawRoundOver()
+    {
+        Raylib.DrawRectangle(440, 320, 400, 150, new Color(0, 0, 0, 210));
+        Ui.Text("Время вышло", 560, 340, 32);
+        return Ui.Button(new Rectangle(540, 400, 200, 46), "В комнату");
     }
 
     private void DrawMap()
@@ -126,7 +133,7 @@ public sealed class GameScreen
             var cursed = snapshot.IsCursed(i);
             Raylib.DrawCircleV(center, Cell * 0.3f, cursed ? CursedColor : ItemColor);
             var label = (i + 1).ToString();
-            Ui.Text(label, center.X - Ui.MeasureText(label, 18) / 2, center.Y - 9, 18, Ui.Background);
+            Ui.Text(label, center.X - Ui.MeasureText(label, 18) / 2, center.Y - 9, 18, Theme.Background);
         }
     }
 
@@ -174,7 +181,7 @@ public sealed class GameScreen
             ? "WASD — движение, ЛКМ у предмета — проклинать"
             : "WASD — движение, мышь — направление фонаря, ЛКМ — фонарь";
         Raylib.DrawRectangle(8, GameMap.Height * Cell - 36, (int)Ui.MeasureText(hint, 18) + 24, 30, HudColor);
-        Ui.Text(hint, 20, GameMap.Height * Cell - 31, 18, Ui.Muted);
+        Ui.Text(hint, 20, GameMap.Height * Cell - 31, 18, Theme.Muted);
     }
 
     private static Vector2 ToPixels(Vector2 cells) => cells * Cell;

@@ -1,6 +1,8 @@
 ﻿using System.Net;
 using System.Net.Sockets;
 using GhostGame.Client;
+using GhostGame.Client.Graphics;
+using GhostGame.Client.Screens;
 using GhostGame.Shared;
 using Raylib_cs;
 
@@ -40,9 +42,10 @@ Raylib.SetTargetFPS(60);
 Raylib.SetExitKey(KeyboardKey.Null); // Esc не закрывает окно
 Ui.LoadFont();
 
-var nickInput = new TextInput(16, focused: true);
-var roomNameInput = new TextInput(24);
-var chatInput = new TextInput(200);
+// Экраны меню: только рисуют и сообщают, что нажали. Что отправить серверу, решает этот файл.
+var connectScreen = new ConnectScreen();
+var lobbyScreen = new LobbyScreen();
+var roomScreen = new RoomScreen();
 
 // Главный цикл кадров. Всё, что связано с окном, — только здесь, в главном потоке (ТЗ 5.3).
 // Поэтому здесь нет await: после await код мог бы продолжиться в другом потоке, а Raylib работает только в этом.
@@ -53,15 +56,15 @@ while (!Raylib.WindowShouldClose())
     CheckConnection(now);
 
     Raylib.BeginDrawing();
-    Raylib.ClearBackground(Ui.Background);
+    Raylib.ClearBackground(Theme.Background);
     switch (screen)
     {
-        case Screen.Connect: DrawConnect(); break;
-        case Screen.Lobby: DrawLobby(now); break;
-        case Screen.Room: DrawRoom(); break;
-        case Screen.Game: DrawGame(now); break;
+        case Screen.Connect: ConnectFrame(); break;
+        case Screen.Lobby: LobbyFrame(now); break;
+        case Screen.Room: RoomFrame(); break;
+        case Screen.Game: GameFrame(now); break;
     }
-    DrawStatus(now);
+    StatusFrame(now);
     Raylib.EndDrawing();
 }
 
@@ -181,7 +184,7 @@ void HandlePacket(Packet packet)
             connected = true;
             helloSentAt = -1;
             screen = Screen.Lobby;
-            roomNameInput.Focused = true;
+            lobbyScreen.Focus();
             ShowStatus($"Подключено, ваш id: {myId}");
             RequestRooms();
             break;
@@ -209,7 +212,7 @@ void HandlePacket(Packet packet)
             if (screen == Screen.Lobby)
             {
                 screen = Screen.Room;
-                chatInput.Focused = true;
+                roomScreen.Focus();
             }
             break;
 
@@ -309,124 +312,72 @@ async Task ResendLoopAsync(ReliableChannel ch)
 }
 
 // ===================== экраны =====================
+// Каждая функция — один кадр своего экрана: экран рисует себя и сообщает, что нажали,
+// а здесь решаем, какой пакет отправить и куда перейти. Сами экраны про сеть ничего не знают.
 
-void DrawConnect()
+void ConnectFrame()
 {
-    Ui.Text("Призрак и охотники", 440, 200, 48);
-    Ui.Text($"Сервер: {server}", 440, 270, 20, Ui.Muted);
-    Ui.Text("Ник:", 440, 332);
-    var waiting = helloSentAt >= 0;
-    var enter = nickInput.Draw(new Rectangle(500, 320, 320, 44), "3–16 символов");
-    var click = Ui.Button(new Rectangle(500, 380, 320, 48), waiting ? "Подключение…" : "Войти", enabled: !waiting);
-    if ((enter || click) && !waiting && nickInput.Text.Trim().Length > 0)
+    var nick = connectScreen.Draw(server.ToString(), waiting: helloSentAt >= 0);
+    if (nick != null)
     {
-        Connect(nickInput.Text.Trim());
+        Connect(nick);
     }
 }
 
-void DrawLobby(long now)
+void LobbyFrame(long now)
 {
     if (now - lastRoomsRequest > 3000)
     {
         RequestRooms(); // список комнат сам обновляется раз в 3 с
     }
 
-    Ui.Text("Лобби", 40, 30, 40);
-    Ui.Text($"Вы: {nickInput.Text.Trim()} (id {myId})   ·   пинг: {(pingMs < 0 ? "—" : $"{pingMs} мс")}", 40, 85, 20, Ui.Muted);
-
-    Ui.Text("Комнаты — клик, чтобы войти:", 40, 140, 24);
-    if (rooms.Count == 0)
+    switch (lobbyScreen.Draw(rooms, connectScreen.Nick, myId, pingMs))
     {
-        Ui.Text("Комнат пока нет — создайте свою справа", 40, 185, 20, Ui.Muted);
-    }
-    for (var i = 0; i < rooms.Count; i++)
-    {
-        var r = rooms[i];
-        var full = r.Players >= r.MaxPlayers;
-        var note = r.InGame ? "   — идёт игра" : full ? "   — заполнена" : "";
-        if (Ui.Button(new Rectangle(40, 180 + i * 56, 640, 46), $"{r.Name}   {r.Players}/{r.MaxPlayers}{note}", 22, !r.InGame && !full))
-        {
-            Send(PacketType.JoinRoom, Packets.WriteJoinRoom(r.RoomId));
-        }
-    }
-    if (Ui.Button(new Rectangle(40, 650, 200, 46), "Обновить"))
-    {
-        RequestRooms();
-    }
-
-    Ui.Text("Новая комната:", 760, 140, 24);
-    var enter = roomNameInput.Draw(new Rectangle(760, 180, 440, 44), "название, 1–24 символа");
-    var click = Ui.Button(new Rectangle(760, 236, 200, 46), "Создать");
-    if ((enter || click) && roomNameInput.Text.Trim().Length > 0)
-    {
-        Send(PacketType.CreateRoom, Packets.WriteCreateRoom(roomNameInput.Text.Trim()));
-        roomNameInput.Text = "";
+        case LobbyAction.Join join:
+            Send(PacketType.JoinRoom, Packets.WriteJoinRoom(join.RoomId));
+            break;
+        case LobbyAction.Create create:
+            Send(PacketType.CreateRoom, Packets.WriteCreateRoom(create.Name));
+            break;
+        case LobbyAction.Refresh:
+            RequestRooms();
+            break;
     }
 }
 
-void DrawRoom()
+void RoomFrame()
 {
     if (room is not { } r)
     {
         return;
     }
 
-    Ui.Text($"Комната «{r.Name}»", 40, 30, 40);
-    Ui.Text("Раунд начнётся, когда в комнате 3–5 игроков и все готовы", 40, 85, 20, Ui.Muted);
-
-    for (var i = 0; i < r.Players.Count; i++)
+    switch (roomScreen.Draw(r.Name, r.HostId, r.Players, myId, chat))
     {
-        var p = r.Players[i];
-        var y = 150 + i * 44;
-        var tags = (p.PlayerId == r.HostId ? "  (хост)" : "") + (p.PlayerId == myId ? "  (вы)" : "");
-        Ui.Text(p.Nick + tags, 60, y, 24);
-        Ui.Text(p.Ready ? "готов" : "не готов", 400, y, 24, p.Ready ? Ui.Accent : Ui.Muted);
-    }
-
-    // готовность берём из RoomState — сервер главный (ТЗ 3.4: SetReady переключает)
-    var meReady = r.Players.FirstOrDefault(p => p.PlayerId == myId)?.Ready ?? false;
-    if (Ui.Button(new Rectangle(40, 400, 220, 50), meReady ? "Не готов" : "Готов"))
-    {
-        Send(PacketType.SetReady, Array.Empty<byte>());
-    }
-    if (Ui.Button(new Rectangle(280, 400, 220, 50), "Выйти"))
-    {
-        // выходящему сервер RoomState не присылает — он уже не в комнате, поэтому уходим в лобби сами
-        Send(PacketType.LeaveRoom, Array.Empty<byte>());
-        room = null;
-        chat.Clear();
-        screen = Screen.Lobby;
-        roomNameInput.Focused = true;
-        RequestRooms();
-    }
-
-    Ui.Text("Чат комнаты", 640, 140, 24);
-    Raylib.DrawRectangle(640, 180, 600, 480, Ui.Panel);
-    Raylib.BeginScissorMode(640, 180, 600, 480); // длинные строки не вылезают за панель
-    var lines = chat.TakeLast(18).ToList();
-    for (var i = 0; i < lines.Count; i++)
-    {
-        Ui.Text(lines[i], 652, 190 + i * 25, 20);
-    }
-    Raylib.EndScissorMode();
-
-    var enter = chatInput.Draw(new Rectangle(640, 676, 460, 44), "сообщение, Enter — отправить");
-    var click = Ui.Button(new Rectangle(1110, 676, 130, 44), "Отправить", 20);
-    if ((enter || click) && chatInput.Text.Trim().Length > 0)
-    {
-        Send(PacketType.Chat, Packets.WriteChat(chatInput.Text.Trim()));
-        chatInput.Text = "";
+        case RoomAction.ToggleReady:
+            Send(PacketType.SetReady, Array.Empty<byte>()); // сервер переключит и пришлёт RoomState (ТЗ 3.4)
+            break;
+        case RoomAction.Leave:
+            // выходящему сервер RoomState не присылает — он уже не в комнате, поэтому уходим в лобби сами
+            Send(PacketType.LeaveRoom, Array.Empty<byte>());
+            room = null;
+            chat.Clear();
+            screen = Screen.Lobby;
+            lobbyScreen.Focus();
+            RequestRooms();
+            break;
+        case RoomAction.Chat message:
+            Send(PacketType.Chat, Packets.WriteChat(message.Text));
+            break;
     }
 }
 
-void DrawGame(long now)
+void GameFrame(long now)
 {
     if (game == null)
     {
         return;
     }
-
-    game.Draw();
 
     // Input 20 раз в секунду независимо от частоты кадров, inputSeq растёт (ТЗ 5.3); без гарантий
     if (now - lastInputAt >= 50)
@@ -435,28 +386,21 @@ void DrawGame(long now)
         SendUnreliable(PacketType.Input, Packets.WriteInput(++inputSeq, game.ReadInput()));
     }
 
-    if (game.TimeLeft == 0)
+    if (game.Draw()) // время вышло и нажали «В комнату»
     {
-        Raylib.DrawRectangle(440, 320, 400, 150, new Color(0, 0, 0, 210));
-        Ui.Text("Время вышло", 560, 340, 32);
-        if (Ui.Button(new Rectangle(540, 400, 200, 46), "В комнату"))
-        {
-            game = null;
-            screen = room != null ? Screen.Room : Screen.Lobby;
-        }
+        game = null;
+        screen = room != null ? Screen.Room : Screen.Lobby;
     }
 }
 
-void DrawStatus(long now)
+void StatusFrame(long now)
 {
     if (screen == Screen.Game || now > statusUntil)
     {
         return;
     }
-    var color = status.StartsWith("Ошибка") || status.StartsWith("Сервер") || status.StartsWith("Соединение")
-        ? Ui.ErrorColor
-        : Ui.Muted;
-    Ui.Text(status, 40, 750, 22, color);
+    var isError = status.StartsWith("Ошибка") || status.StartsWith("Сервер") || status.StartsWith("Соединение");
+    Ui.StatusLine(status, isError);
 }
 
 enum Screen
