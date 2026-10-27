@@ -10,7 +10,7 @@ public class Room
     public const ushort RoundSeconds = 240;
 
     private static int id = 1;
-
+    
     public Room(string name)
     {
         Name = name;
@@ -27,6 +27,10 @@ public class Room
 
     // состояния игроков в текущем раунде: ключ — playerId; пусто, пока раунд не идёт
     public Dictionary<int, PlayerState> Round { get; } = new();
+
+    // Round трогают два потока: цикл приёма (ApplyInput) и игровой цикл комнаты.
+    // Один замок на всю комнату: все, кто читает или пишет Round, запирают именно его.
+    private readonly object roundLock = new();
 
     public bool IsFull => Players.Count >= MaxPlayers;
     public bool IsEmpty => Players.Count == 0;
@@ -82,7 +86,6 @@ public class Room
         InGame = true;
         var players = Players.Values.ToList();
         var ghost = players[Random.Shared.Next(players.Count)];
-        // точки появления пока (0, 0) — настоящие будут на этапе 5 вместе с картой
         var ghostPosition = players.Where(p => p.PlayerId == ghost.PlayerId)
             .Select(p => new PlayerSpawn(p.PlayerId,map.GhostSpawn.X, map.GhostSpawn.Y)).ToList();
         
@@ -91,11 +94,14 @@ public class Room
         
         var spawns = ghostPosition.Concat(huntersPosition).ToList();
         
-        Round.Clear();
-        foreach (var s in spawns)
+        lock (roundLock)
         {
-            var role = s.PlayerId == ghost.PlayerId ? Role.Ghost : Role.Hunter;
-            Round[s.PlayerId] = new PlayerState(Players[s.PlayerId], role, s.X, s.Y);
+            Round.Clear();
+            foreach (var s in spawns)
+            {
+                var role = s.PlayerId == ghost.PlayerId ? Role.Ghost : Role.Hunter;
+                Round[s.PlayerId] = new PlayerState(Players[s.PlayerId], role, s.X, s.Y);
+            }
         }
         
         foreach (var player in players)
@@ -104,5 +110,28 @@ public class Room
             await player.Channel.SendAsync(PacketType.GameStart, Packets.WriteGameStart(role, RoundSeconds, spawns));
         }
         return ghost;
+    }
+
+    // Запомнить Input игрока (ТЗ 4.3). Пакет уже разобран в Program.cs — сюда приходят готовые значения.
+    // Берём только Input с номером больше последнего принятого: опоздавший или повторный выбрасываем.
+    // «Перескок» через номер — нормально: пропавший Input не нужен, новый и так говорит, что нажато сейчас.
+    public void ApplyInput(int playerId, uint inputSeq, InputState input)
+    {
+        lock (roundLock)
+        {
+            if (!InGame || !Round.TryGetValue(playerId, out var player))
+            {
+                return; // раунд не идёт или игрока в раунде нет
+            }
+
+            if (inputSeq <= player.LastInputSeq)
+            {
+                return; // опоздавший или повтор
+            }
+
+            player.LastInputSeq = inputSeq;
+            player.Input = input;
+            player.LastInputAt = Environment.TickCount64;
+        }
     }
 }

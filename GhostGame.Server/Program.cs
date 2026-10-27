@@ -118,6 +118,23 @@ async Task HandlePacketAsync(ClientSession session, IPEndPoint from, Packet pack
             await HandleRoomPacketAsync(session, from, packet);
             break;
 
+        case PacketType.Input:
+            // Input без гарантий: канал отдал его сразу, устаревшие отсеет ApplyInput по inputSeq
+            var (inputSeq, input) = Packets.ReadInput(packet.Payload);
+            await roomsGate.WaitAsync();
+            try
+            {
+                if (rooms.TryGetValue(session.RoomId, out var gameRoom))
+                {
+                    gameRoom.ApplyInput(session.PlayerId, inputSeq, input);
+                }
+            }
+            finally
+            {
+                roomsGate.Release();
+            }
+            break;
+
         default:
             Console.WriteLine($"[{from}] unexpected packet {packet.Type}");
             await session.Channel.SendAsync(PacketType.Error,
