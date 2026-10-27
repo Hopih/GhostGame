@@ -15,4 +15,9 @@
       <PackageReference Include="Raylib-cs" Version="7.0.2" />
     </ItemGroup>
 
+    <ItemGroup>
+      <!-- спрайты лежат рядом с программой, как map.txt -->
+      <None Update="assets\**" CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
+
 </Project>

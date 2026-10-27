@@ -37,10 +37,15 @@ var lastInputAt = 0L;
 var lastPingAt = 0L;
 
 Raylib.SetTraceLogLevel(TraceLogLevel.Warning);
-Raylib.InitWindow(1920, 1080, "Призрак и охотники");
+// Окно открывается развёрнутым на весь экран (окно 1920×1080 на экране 1920×1080 не влезает из-за заголовка и панели задач).
+// Его можно свернуть в окно и растягивать — экраны раскладываются от размера окна. MSAA сглаживает края кругов.
+Raylib.SetConfigFlags(ConfigFlags.ResizableWindow | ConfigFlags.Msaa4xHint);
+Raylib.InitWindow(1600, 900, "Призрак и охотники");
+Raylib.MaximizeWindow();
+Raylib.SetWindowMinSize(1240, 780);
 Raylib.SetTargetFPS(60);
 Raylib.SetExitKey(KeyboardKey.Null); // Esc не закрывает окно
-Ui.LoadFont();
+Assets.Load(); // спрайты и шрифт — только после InitWindow
 
 // Экраны меню: только рисуют и сообщают, что нажали. Что отправить серверу, решает этот файл.
 var connectScreen = new ConnectScreen();
@@ -386,7 +391,7 @@ void GameFrame(long now)
         SendUnreliable(PacketType.Input, Packets.WriteInput(++inputSeq, game.ReadInput()));
     }
 
-    if (game.Draw()) // время вышло и нажали «В комнату»
+    if (game.Draw(pingMs)) // время вышло и нажали «В комнату»
     {
         game = null;
         screen = room != null ? Screen.Room : Screen.Lobby;
