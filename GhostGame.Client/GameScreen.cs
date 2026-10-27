@@ -62,6 +62,9 @@ public sealed class GameScreen
 
     public Role MyRole => myRole;
 
+    // сколько секунд осталось по последнему Snapshot; 0 — время раунда вышло
+    public ushort TimeLeft => snapshot.TimeLeft;
+
     // ТЗ 5.3: Snapshot применяется, только если его tick больше последнего применённого.
     // Опоздавший или повторный Snapshot просто отбрасывается. Возвращает true, если снимок применён.
     public bool ApplySnapshot(Snapshot next)

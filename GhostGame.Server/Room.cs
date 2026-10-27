@@ -140,34 +140,70 @@ public class Room
         }
     }
 
+    // Игровой цикл комнаты (ТЗ 4.3): раз в 50 мс сдвинуть всех по их Input и разослать Snapshot.
+    // Работает в фоне (Task.Run из StartGameAsync), пока идёт раунд.
     public async Task GameLoopAsync(GameMap map, Transport transport)
     {
-        uint tick = 0;
-        while (InGame)                                     // (2) крутимся весь раунд, а не один раз
-        {
-            await Task.Delay(50);                          // (2) 20 тиков в секунду, без блокировки потока
-            tick++;
+        const float TickSeconds = 0.05f;   // длина тика: 20 тиков в секунду
+        const float PlayerRadius = 0.35f;  // «толщина» игрока для стен — такая же, как рисует клиент
 
-            var snapshots = new List<SnapshotPlayer>();    // новый список на каждый тик
+        uint tick = 0;
+        var endAt = Environment.TickCount64 + RoundSeconds * 1000L; // когда раунд закончится
+        while (InGame)
+        {
+            await Task.Delay(50);
+            tick++;
+            var now = Environment.TickCount64;
+            var msLeft = Math.Max(0, endAt - now);
+            var timeLeft = (ushort)((msLeft + 999) / 1000); // сколько секунд осталось, с округлением вверх
+
+            var snapshots = new List<SnapshotPlayer>(); // новый список на каждый тик
             List<PlayerState> recipients;
             lock (roundLock)
             {
-                foreach (var player in Round.Values)       // (4) этап 1: сдвинуть всех и собрать список
+                // этап 1: сдвинуть всех и собрать список для снимка
+                foreach (var player in Round.Values)
                 {
-                    var input = player.Input;              // (1) Input не стираем — нажатие держится до нового
-                    player.X += input.MoveX * player.Speed * 0.05f;   // (3) скорость в секунду × 0.05 с
-                    player.Y += input.MoveY * player.Speed * 0.05f;
-                    var snapshotPlayer = new SnapshotPlayer(player.Session.PlayerId, player.X, player.Y, input.AimX, input.AimY, 0);
-                    snapshots.Add(snapshotPlayer);
+                    // 500 мс без Input — считаем, что ничего не нажато (ТЗ 4.3). Само нажатие не стираем.
+                    var input = now - player.LastInputAt > 500 ? InputState.Idle : player.Input;
+
+                    var step = player.Speed * TickSeconds; // скорость в клетках/с × длина тика
+                    if (input.MoveX != 0 && input.MoveY != 0)
+                    {
+                        step *= 0.7071f; // по диагонали не быстрее, чем по прямой (1/√2)
+                    }
+                    
+                    var newX = player.X + input.MoveX * step;
+                    if (map.CanStandAt(newX, player.Y, PlayerRadius))
+                    {
+                        player.X = newX;
+                    }
+                    var newY = player.Y + input.MoveY * step;
+                    if (map.CanStandAt(player.X, newY, PlayerRadius))
+                    {
+                        player.Y = newY;
+                    }
+                    
+                    var flags = player.Role == Role.Hunter && input.Primary ? SnapshotPlayer.FlagFlashlight : (byte)0;
+      
+                    snapshots.Add(new SnapshotPlayer(player.Session.PlayerId, player.X, player.Y,
+                        player.Input.AimX, player.Input.AimY, flags));
                 }
-                recipients = Round.Values.ToList();         // кому слать — копия, чтобы не трогать Round вне замка
+                recipients = Round.Values.ToList(); // кому слать — копия, чтобы не трогать Round вне замка
             }
 
-            var snapshot = new Snapshot(tick, RoundSeconds, snapshots, 0);   // (4) этап 2: один снимок на всех
-            foreach (var player in recipients)                              // (4) этап 3: каждому, включая самого игрока
+            // этап 2: один снимок на всех; этап 3: каждому, включая самого игрока
+            var snapshot = new Snapshot(tick, timeLeft, snapshots, 0);
+            foreach (var player in recipients)
             {
                 await transport.SendUnreliableAsync(PacketType.Snapshot, Packets.WriteSnapshot(snapshot),
                     player.Session.EndPoint);
+            }
+
+            if (msLeft == 0)
+            {
+                InGame = false; 
+                Console.WriteLine($"Комната «{Name}»: время раунда вышло");
             }
         }
     }
