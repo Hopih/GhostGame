@@ -45,15 +45,15 @@ public static class Flashlight
         return NoWallsBetween(map, from, target, distance);
     }
 
-    // Идём от фонаря к точке шагами по 0,05 клетки: попалась по пути стена — луч до точки не доходит.
-    // Дверь (D) — не стена, через дверной проём светит.
+    // Идём от фонаря к точке шагами по 0,05 клетки: попалась по пути стена или высокая мебель (шкаф, колонна) —
+    // луч до точки не доходит. Через дверной проём, стол или бочку светит.
     private static bool NoWallsBetween(GameMap map, Vector2 from, Vector2 target, float distance)
     {
         var steps = (int)(distance / Step);
         for (var i = 1; i <= steps; i++)
         {
             var point = Vector2.Lerp(from, target, i / (float)steps); // i-я точка на отрезке от from до target
-            if (map.IsWall((int)MathF.Floor(point.X), (int)MathF.Floor(point.Y)))
+            if (map.BlocksLight((int)MathF.Floor(point.X), (int)MathF.Floor(point.Y)))
             {
                 return false;
             }

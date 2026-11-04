@@ -24,9 +24,11 @@ public sealed class GameScreen
     private readonly IReadOnlyDictionary<int, string> nicks;
     private readonly List<RosterEntry> roster;
     private readonly LightRenderer light = new();
+    private readonly List<Vector2> lamps;  // факелы и светящиеся чаши — постоянные пятна света
     private Snapshot previous;  // предпоследний применённый Snapshot
     private Snapshot current;   // последний применённый Snapshot
     private long currentAt;     // когда применили последний
+    private Vector2 focus;      // куда смотрит камера: свой игрок в прошлом кадре
 
     // spawns и roundSeconds — из GameStart, nicks — playerId → ник из последнего RoomState
     public GameScreen(GameMap map, int myId, Role myRole, ushort roundSeconds, List<PlayerSpawn> spawns,
@@ -52,6 +54,10 @@ public sealed class GameScreen
         current = new Snapshot(0, roundSeconds, players, 0);
         previous = current;
         currentAt = Environment.TickCount64;
+
+        var me = spawns.First(s => s.PlayerId == myId);
+        focus = new Vector2(me.X, me.Y);
+        lamps = MapRenderer.FindLamps(map);
     }
 
     public Role MyRole => myRole;
@@ -80,7 +86,7 @@ public sealed class GameScreen
         if (Raylib.IsKeyDown(KeyboardKey.W)) moveY--;
         if (Raylib.IsKeyDown(KeyboardKey.S)) moveY++;
 
-        var aim = GameLayout.ForWindow().ToCells(Raylib.GetMousePosition()); // где на карте мышь — туда смотрит фонарь
+        var aim = GameLayout.ForWindow(focus).ToCells(Raylib.GetMousePosition()); // где на карте мышь — туда смотрит фонарь
         var actions = Raylib.IsMouseButtonDown(MouseButton.Left) ? InputState.ActionPrimary : (byte)0;
         return new InputState(moveX, moveY, aim.X, aim.Y, actions);
     }
@@ -89,18 +95,32 @@ public sealed class GameScreen
     // Возвращает true, когда время раунда вышло и нажали «В комнату».
     public bool Draw(long pingMs)
     {
-        var layout = GameLayout.ForWindow();
         var players = Players();
+        var me = players.FirstOrDefault(p => p.IsMe);
+        if (me.IsMe)
+        {
+            focus = me.Position; // камера смотрит на себя
+        }
+        var layout = GameLayout.ForWindow(focus);
         var time = Raylib.GetTime();
         var ghostView = myRole == Role.Ghost;
 
+        // всё, что в мире, рисуем только внутри окна в мир — карта больше него (scissor обрезает остальное)
+        var view = layout.Viewport;
+        Raylib.BeginScissorMode((int)view.X, (int)view.Y, (int)view.Width, (int)view.Height);
         MapRenderer.Draw(map, layout, current.CurseMask, time);
         PlayerRenderer.DrawBodies(players, layout, time);
-        light.Draw(layout, players, map.Items, ghostView);   // темнота поверх карты и игроков
+        Raylib.EndScissorMode(); // темнота рисуется в отдельную текстуру, а scissor ей мешал бы; ложится ровно в окно
+        light.Draw(layout, players, map.Items, lamps, ghostView);
+        Raylib.BeginScissorMode((int)view.X, (int)view.Y, (int)view.Width, (int)view.Height);
         PlayerRenderer.DrawBeams(players, layout, ghostView);
-        PlayerRenderer.DrawNames(players, layout);           // ники поверх темноты
+        PlayerRenderer.DrawNames(players, layout);                  // ники поверх темноты
         PlayerRenderer.DrawCatchBar(players, layout, current.CatchProgress);
-        HudRenderer.Draw(layout, myRole, myId, current.TimeLeft, current.CurseMask, current.CatchProgress, roster, pingMs);
+        Raylib.EndScissorMode();
+        Raylib.DrawRectangleRoundedLinesEx(view, 0.01f, 4, 2, Theme.PanelBorder);
+
+        HudRenderer.Draw(layout, map, players, myRole, myId, current.TimeLeft, current.CurseMask, current.CatchProgress,
+            roster, pingMs);
         return current.TimeLeft == 0 && HudRenderer.DrawRoundOver(layout);
     }
 

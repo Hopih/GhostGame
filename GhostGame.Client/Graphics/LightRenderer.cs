@@ -4,7 +4,7 @@ using Raylib_cs;
 namespace GhostGame.Client.Graphics;
 
 // Темнота и свет — только картинка для атмосферы. Кого на самом деле видно, решает сервер (туман войны, этап 6).
-// Как устроено: отдельная «плёнка» (RenderTexture) размером с карту заливается почти чёрным,
+// Как устроено: отдельная «плёнка» (RenderTexture) размером с окно в мир заливается почти чёрным,
 // в ней «стираются» светлые места — вокруг себя, вокруг охотников, лучи фонарей, предметы —
 // и плёнка кладётся поверх уже нарисованных карты и игроков.
 public sealed class LightRenderer
@@ -17,24 +17,32 @@ public sealed class LightRenderer
 
     private RenderTexture2D film;
 
-    public void Draw(GameLayout layout, IReadOnlyList<PlayerView> players, IReadOnlyList<Vector2> items, bool ghostView)
+    // lamps — факелы и чаши на карте: вокруг них всегда светло. Плёнка размером с окно в мир, не со всю карту.
+    public void Draw(GameLayout layout, IReadOnlyList<PlayerView> players, IReadOnlyList<Vector2> items,
+        IReadOnlyList<Vector2> lamps, bool ghostView)
     {
-        Resize(layout.MapWidth, layout.MapHeight);
+        var view = layout.Viewport;
+        Resize((int)view.Width, (int)view.Height);
         var cell = layout.Cell;
+        var corner = new Vector2(view.X, view.Y);
+        Vector2 OnFilm(Vector2 cells) => layout.ToScreen(cells) - corner; // клетки карты → пиксели внутри плёнки
 
         Raylib.BeginTextureMode(film);
         Raylib.ClearBackground(new Color(8, 5, 12, ghostView ? 80 : 190)); // призрак видит всю карту (ТЗ 5.1) — ему темнота слабая
         Rlgl.SetBlendFactors(GlZero, GlOneMinusSrcAlpha, GlFuncAdd);
         Raylib.BeginBlendMode(BlendMode.Custom);
 
-        // внутри плёнки координаты считаются от левого верхнего угла карты: клетки × размер клетки
+        foreach (var lamp in lamps)
+        {
+            Hole(OnFilm(lamp), cell * 2.4f, 170);
+        }
         foreach (var item in items)
         {
-            Hole(item * cell, cell * 1.1f, 160);
+            Hole(OnFilm(item), cell * 1.1f, 160);
         }
         foreach (var p in players)
         {
-            var at = p.Position * cell;
+            var at = OnFilm(p.Position);
             if (p.IsMe)
             {
                 Hole(at, cell * 3.2f, 255);
@@ -54,7 +62,7 @@ public sealed class LightRenderer
 
         // у RenderTexture ось Y перевёрнута (так устроен OpenGL) — поэтому высота источника со знаком минус
         var source = new Rectangle(0, 0, film.Texture.Width, -film.Texture.Height);
-        Raylib.DrawTexturePro(film.Texture, source, layout.Map, Vector2.Zero, 0, Color.White);
+        Raylib.DrawTexturePro(film.Texture, source, view, Vector2.Zero, 0, Color.White);
     }
 
     // Мягкое пятно света: в центре плёнка стирается сильнее всего, к краю всё слабее

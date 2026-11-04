@@ -4,11 +4,11 @@ using Raylib_cs;
 
 namespace GhostGame.Client.Graphics;
 
-// Панель справа от карты: роль, таймер, проклятые предметы, игроки, пинг, подсказка по управлению
+// Панель справа от карты: роль, таймер, поимка, проклятые предметы, мини-карта, игроки, пинг, подсказка
 public static class HudRenderer
 {
-    public static void Draw(GameLayout layout, Role myRole, int myId, ushort timeLeft, byte curseMask, byte catchProgress,
-        IReadOnlyList<RosterEntry> roster, long pingMs)
+    public static void Draw(GameLayout layout, GameMap map, IReadOnlyList<PlayerView> players, Role myRole, int myId,
+        ushort timeLeft, byte curseMask, byte catchProgress, IReadOnlyList<RosterEntry> roster, long pingMs)
     {
         var panel = layout.Panel;
         Ui.Panel(panel);
@@ -50,6 +50,9 @@ public static class HudRenderer
         }
         y += 22 + icon + 20;
 
+        // мини-карта всего особняка
+        y += DrawMinimap(layout, map, players, curseMask, x, y, width) + 16;
+
         // игроки раунда
         Ui.Text("ИГРОКИ", x, y, 16, Theme.Muted);
         y += 22;
@@ -79,11 +82,65 @@ public static class HudRenderer
         Ui.Paragraph(hint, x, y, width, 17, Theme.Muted);
     }
 
-    // Время раунда вышло: затемнить карту и показать окошко. true — нажали «В комнату».
+    // Мини-карта: весь особняк по клетке на несколько пикселей, сундуки, видимые игроки и рамка «что сейчас в окне».
+    // Игроки — те же, что и на экране, поэтому охотник видит на ней призрака, только пока тот в луче (туман войны).
+    // Возвращает высоту, которую заняла.
+    private static float DrawMinimap(GameLayout layout, GameMap map, IReadOnlyList<PlayerView> players, byte curseMask,
+        float x, float y, float width)
+    {
+        Ui.Text("КАРТА", x, y, 16, Theme.Muted);
+        var top = y + 22;
+        var dot = MathF.Max(1, MathF.Floor(width / GameMap.Width)); // пикселей на клетку — целое, чтобы не было швов
+        var left = x + (width - dot * GameMap.Width) / 2;
+        Vector2 At(Vector2 cells) => new(left + cells.X * dot, top + cells.Y * dot);
+
+        for (var cy = 0; cy < GameMap.Height; cy++)
+        {
+            for (var cx = 0; cx < GameMap.Width; cx++)
+            {
+                var color = map.IsWall(cx, cy) ? Theme.MiniWall
+                    : map.IsSolid(cx, cy) ? Theme.MiniFurniture
+                    : map[cx, cy] switch
+                    {
+                        ',' => Theme.MiniStone,
+                        '=' => Theme.MiniWood,
+                        '~' => Theme.MiniCarpet,
+                        'D' => Theme.Wood,
+                        _ => Theme.MiniSand,
+                    };
+                Raylib.DrawRectangleRec(new Rectangle(left + cx * dot, top + cy * dot, dot, dot), color);
+            }
+        }
+
+        for (var i = 0; i < map.Items.Count; i++)
+        {
+            var cursed = (curseMask & (1 << i)) != 0;
+            Raylib.DrawCircleV(At(map.Items[i]), dot * 1.3f, cursed ? Theme.CurseGlow : Theme.Accent);
+        }
+        foreach (var p in players)
+        {
+            var color = p.IsMe ? Theme.Me : p.IsGhost ? Theme.Stone : Theme.MiniHunter;
+            Raylib.DrawCircleV(At(p.Position), dot * (p.IsMe ? 1.8f : 1.4f), color);
+        }
+
+        // какая часть карты сейчас в окне
+        var view = layout.Viewport;
+        var a = layout.ToCells(new Vector2(view.X, view.Y));
+        var b = layout.ToCells(new Vector2(view.X + view.Width, view.Y + view.Height));
+        var frame = new Rectangle(At(a).X, At(a).Y, (b.X - a.X) * dot, (b.Y - a.Y) * dot);
+        Raylib.BeginScissorMode((int)left, (int)top, (int)(dot * GameMap.Width), (int)(dot * GameMap.Height));
+        Raylib.DrawRectangleLinesEx(frame, 1, Raylib.Fade(Theme.Text, 0.6f));
+        Raylib.EndScissorMode();
+
+        return 22 + dot * GameMap.Height;
+    }
+
+    // Время раунда вышло: затемнить окно в мир и показать окошко. true — нажали «В комнату».
     public static bool DrawRoundOver(GameLayout layout)
     {
-        Raylib.DrawRectangleRec(layout.Map, Theme.Overlay);
-        var center = layout.MapOrigin + new Vector2(layout.MapWidth, layout.MapHeight) / 2;
+        var view = layout.Viewport;
+        Raylib.DrawRectangleRec(view, Theme.Overlay);
+        var center = new Vector2(view.X + view.Width / 2, view.Y + view.Height / 2);
         var box = new Rectangle(center.X - 220, center.Y - 100, 440, 200);
         Ui.Panel(box);
         Ui.TextCentered("Время вышло", center.X, box.Y + 32, 40);

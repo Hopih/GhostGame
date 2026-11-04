@@ -45,16 +45,14 @@ public static class PlayerRenderer
     // Это только картинка: кого поймал луч, решает сервер (этап 6).
     public static void DrawBeams(IReadOnlyList<PlayerView> players, GameLayout layout, bool ghostView)
     {
+        // за край окна луч не вылезет: GameScreen рисует всё это внутри scissor по окну в мир
         var color = ghostView ? Theme.DangerBeam : Theme.Beam;
-        var map = layout.Map;
-        Raylib.BeginScissorMode((int)map.X, (int)map.Y, (int)map.Width, (int)map.Height); // луч у края не вылезает за карту
         foreach (var p in players.Where(p => p.FlashlightOn))
         {
             var angle = BeamAngle(p);
             Raylib.DrawCircleSector(layout.ToScreen(p.Position), FlashlightLength * layout.Cell,
                 angle - FlashlightAngle / 2, angle + FlashlightAngle / 2, 24, color);
         }
-        Raylib.EndScissorMode();
     }
 
     // Направление луча в градусах: 0° — вправо, дальше по часовой (ось Y на экране вниз)

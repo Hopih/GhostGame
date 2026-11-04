@@ -38,4 +38,35 @@ public static class Theme
     public static readonly Color CurseGlow = new(190, 80, 255, 160);
     public static readonly Color Plate = new(20, 13, 20, 190);           // подложка под ником
     public static readonly Color Overlay = new(14, 9, 14, 200);          // затемнение карты под окном «Время вышло»
+
+    // --- полы и мебель особняка ---
+    public static readonly Color[] StoneTiles = { new(104, 110, 128, 255), new(96, 102, 120, 255), new(110, 116, 134, 255) };
+    public static readonly Color StoneLight = new(128, 134, 150, 255);   // светлая кромка плитки
+    public static readonly Color StoneSeam = new(70, 74, 90, 255);       // шов между плитками
+    public static readonly Color Parquet = new(166, 110, 72, 255);
+    public static readonly Color ParquetDark = new(154, 100, 64, 255);
+    public static readonly Color ParquetSeam = new(122, 78, 52, 255);
+    public static readonly Color Carpet = new(122, 36, 46, 255);
+    public static readonly Color CarpetDark = new(96, 26, 36, 255);      // узор на ковре
+    public static readonly Color CarpetBorder = new(206, 160, 80, 255);  // золотая кайма
+    public static readonly Color ShelfWood = new(118, 70, 48, 255);
+    public static readonly Color ShelfBack = new(60, 36, 30, 255);
+    public static readonly Color[] Books =
+    {
+        new(172, 60, 58, 255), new(70, 110, 170, 255), new(84, 150, 92, 255),
+        new(206, 170, 84, 255), new(140, 82, 160, 255), new(190, 120, 70, 255),
+    };
+    public static readonly Color Flame = new(255, 170, 60, 255);
+    public static readonly Color FlameCore = new(255, 240, 170, 255);
+    public static readonly Color MagicGlow = new(110, 255, 170, 120);    // свечение чаши с огнём
+    public static readonly Color RoomLabel = new(246, 232, 216, 120);    // название комнаты на полу — бледно
+
+    // --- мини-карта ---
+    public static readonly Color MiniWall = new(28, 19, 27, 255);
+    public static readonly Color MiniSand = new(150, 110, 78, 255);
+    public static readonly Color MiniStone = new(92, 98, 116, 255);
+    public static readonly Color MiniWood = new(118, 76, 54, 255);
+    public static readonly Color MiniCarpet = new(116, 40, 50, 255);
+    public static readonly Color MiniFurniture = new(58, 42, 50, 255);
+    public static readonly Color MiniHunter = new(110, 170, 255, 255);
 }

@@ -1,25 +1,41 @@
+using System.Globalization;
 using System.Numerics;
 
 namespace GhostGame.Shared;
 
-// Карта особняка 32×20 клеток из текстового файла, одинакового у сервера и клиента (ТЗ 4.3):
-// # стена, . пол, D дверь, 1–5 предметы, G точка появления призрака, H точки появления охотников.
+// Карта особняка 64×40 клеток из текстового файла, одинакового у сервера и клиента (ТЗ 4.3).
 // Координаты в клетках: клетка (x, y) занимает квадрат от (x, y) до (x + 1, y + 1), её центр — (x + 0.5, y + 0.5).
+//
+// Символы:
+//   стены          #  W (с факелом)  V (со знаменем)  Y (с оружием)  E (парадный вход)
+//   пол            .  песок   ,  камень   =  паркет   ~  ковёр        D  дверной проём
+//   высокая мебель B книжный шкаф  K шкаф  S колонна              — не пройти, луч не проходит
+//   низкая мебель  T стол  P стол с зельями  b бочка  X крест  R надгробие  O котёл  N наковальня
+//                  A алтарь  F чаша с огнём                      — не пройти, луч светит поверх
+//   декор          c стул  s паук                                — можно ходить
+//   точки          1–5 предметы, G точка появления призрака, H точки появления охотников
+//
+// После 40 строк карты могут идти подписи комнат: «@x y Название» (x, y — центр подписи в клетках).
 public sealed class GameMap
 {
-    public const int Width = 32;
-    public const int Height = 20;
+    public const int Width = 64;
+    public const int Height = 40;
     public const string DefaultFileName = "map.txt";
-    private const string AllowedCells = "#.D12345GH";
+
+    private const string Walls = "#WVYE";
+    private const string TallFurniture = "BKS";
+    private const string LowFurniture = "TPbXRONAF";
+    private const string AllowedCells = Walls + TallFurniture + LowFurniture + ".,=~Dcs12345GH";
 
     private readonly char[,] cells; // cells[x, y]
 
-    private GameMap(char[,] cells, Vector2 ghostSpawn, List<Vector2> hunterSpawns, Vector2[] items)
+    private GameMap(char[,] cells, Vector2 ghostSpawn, List<Vector2> hunterSpawns, Vector2[] items, List<MapLabel> labels)
     {
         this.cells = cells;
         GhostSpawn = ghostSpawn;
         HunterSpawns = hunterSpawns;
         Items = items;
+        Labels = labels;
     }
 
     public Vector2 GhostSpawn { get; }
@@ -28,6 +44,9 @@ public sealed class GameMap
 
     // Items[0] — предмет «1», …, Items[4] — предмет «5»; номер в списке совпадает с битом в curseMask
     public IReadOnlyList<Vector2> Items { get; }
+
+    // Названия комнат — только для картинки, на правила не влияют
+    public IReadOnlyList<MapLabel> Labels { get; }
 
     public char this[int x, int y] => cells[x, y];
 
@@ -41,11 +60,7 @@ public sealed class GameMap
     public static GameMap Parse(string[] fileLines)
     {
         var lines = fileLines.Select(l => l.TrimEnd('\r')).ToList();
-        while (lines.Count > 0 && lines[^1].Length == 0)
-        {
-            lines.RemoveAt(lines.Count - 1); // пустые строки в конце файла не считаем
-        }
-        if (lines.Count != Height)
+        if (lines.Count < Height)
         {
             throw new InvalidDataException($"Карта должна быть из {Height} строк, а их {lines.Count}");
         }
@@ -108,16 +123,47 @@ public sealed class GameMap
             throw new InvalidDataException("На карте должны быть все предметы от 1 до 5");
         }
 
-        return new GameMap(cells, ghostSpawn.Value, hunterSpawns, items.Select(i => i!.Value).ToArray());
+        return new GameMap(cells, ghostSpawn.Value, hunterSpawns, items.Select(i => i!.Value).ToArray(),
+            ParseLabels(lines.Skip(Height)));
     }
 
-    // Стена ли в клетке; всё за краем карты тоже считается стеной
+    // Подписи комнат: «@x y Название». Пустые строки пропускаем.
+    private static List<MapLabel> ParseLabels(IEnumerable<string> lines)
+    {
+        var labels = new List<MapLabel>();
+        foreach (var line in lines.Where(l => l.Length > 0))
+        {
+            var parts = line.Split(' ', 3);
+            if (parts.Length < 3 || !line.StartsWith('@')
+                || !float.TryParse(parts[0][1..], NumberStyles.Float, CultureInfo.InvariantCulture, out var x)
+                || !float.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var y))
+            {
+                throw new InvalidDataException($"Строка подписи «{line}»: нужно «@x y Название»");
+            }
+            labels.Add(new MapLabel(new Vector2(x, y), parts[2]));
+        }
+        return labels;
+    }
+
+    // Стена ли в клетке (в том числе стена с факелом, знаменем и т. п.); всё за краем карты тоже стена
     public bool IsWall(int x, int y)
     {
-        return x < 0 || y < 0 || x >= Width || y >= Height || cells[x, y] == '#';
+        return x < 0 || y < 0 || x >= Width || y >= Height || Walls.Contains(cells[x, y]);
     }
 
-    // Можно ли поставить игрока радиуса radius с центром в (x, y), не задев ни одной стены.
+    // Можно ли пройти через клетку: не стена и не мебель (стулья и пауки не мешают)
+    public bool IsSolid(int x, int y)
+    {
+        return IsWall(x, y) || TallFurniture.Contains(cells[x, y]) || LowFurniture.Contains(cells[x, y]);
+    }
+
+    // Закрывает ли клетка луч фонаря: стены и высокая мебель. Через стол или бочку светит.
+    public bool BlocksLight(int x, int y)
+    {
+        return IsWall(x, y) || TallFurniture.Contains(cells[x, y]);
+    }
+
+    // Можно ли поставить игрока радиуса radius с центром в (x, y), не задев ни стены, ни мебели.
     // Игрок считается квадратом со стороной 2·radius: проверяем все клетки, которые он накрывает.
     public bool CanStandAt(float x, float y, float radius)
     {
@@ -129,7 +175,7 @@ public sealed class GameMap
         {
             for (var cx = left; cx <= right; cx++)
             {
-                if (IsWall(cx, cy))
+                if (IsSolid(cx, cy))
                 {
                     return false;
                 }
@@ -138,3 +184,6 @@ public sealed class GameMap
         return true;
     }
 }
+
+// Подпись комнаты на карте: где (центр, в клетках) и что написать
+public record MapLabel(Vector2 Position, string Text);

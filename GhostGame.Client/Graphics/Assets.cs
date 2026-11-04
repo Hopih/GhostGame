@@ -77,6 +77,24 @@ public static class Sprites
     public const int Mimic = 92;      // проклятый предмет — сундук с языком
     public const int Ghost = 121;
 
+    // мебель и украшения особняка
+    public const int Cabinet = 75;
+    public const int Pillar = 31;      // каменный постамент — и колонна, и алтарь
+    public const int Table = 72;
+    public const int Chair = 73;
+    public const int Barrel = 82;
+    public const int Cross = 64;
+    public const int Grave = 65;
+    public const int Cauldron = 56;
+    public const int Anvil = 74;
+    public const int Basin = 32;       // чаша с зелёным огнём
+    public const int BannerWall = 29;  // кирпичная стена со знаменем
+    public const int DoorLeft = 46;    // створки парадного входа
+    public const int DoorRight = 47;
+    public static readonly int[] Potions = { 113, 114, 115, 116 };
+    public static readonly int[] Weapons = { 104, 117, 106, 118, 105 };
+    public static readonly int[] Critters = { 122, 123, 120 };   // паук, крыса, летучая мышь
+
     private static readonly int[] Hunters = { 96, 98, 99, 100, 112, 97, 85, 88 };
 
     // Спрайт охотника выбирается по playerId, поэтому у всех клиентов и в комнате, и в игре игрок выглядит одинаково
