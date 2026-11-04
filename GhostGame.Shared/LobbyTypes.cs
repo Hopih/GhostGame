@@ -15,3 +15,6 @@ public record RoomPlayer(int PlayerId, string Nick, bool Ready);
 
 // Элемент GameStart: где появляется игрок (ТЗ 3.5)
 public record PlayerSpawn(int PlayerId, float X, float Y);
+
+// Элемент GameOver: кем был игрок в раунде (ТЗ 3.5)
+public record PlayerRole(int PlayerId, Role Role);

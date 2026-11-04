@@ -225,6 +225,40 @@ public static class Packets
         return (role, roundSeconds, spawns);
     }
 
+    // GameOver: winner: byte (0 — охотники, 1 — призрак), reason: byte, список из (playerId: int, role: byte) (ТЗ 3.5)
+    public static byte[] WriteGameOver(Role winner, GameOverReason reason, List<PlayerRole> players)
+    {
+        var w = new PacketWriter();
+        w.WriteByte((byte)winner);
+        w.WriteByte((byte)reason);
+        w.WriteByte((byte)players.Count);
+        foreach (var player in players)
+        {
+            w.WriteInt(player.PlayerId);
+            w.WriteByte((byte)player.Role);
+        }
+
+        return w.ToArray();
+    }
+
+    public static (Role Winner, GameOverReason Reason, List<PlayerRole> Players) ReadGameOver(byte[] payload)
+    {
+        var r = new PacketReader(payload);
+        var winner = (Role)r.ReadByte();
+        var reason = (GameOverReason)r.ReadByte();
+        var count = r.ReadByte();
+        var players = new List<PlayerRole>();
+        for (var i = 0; i < count; i++)
+        {
+            var playerId = r.ReadInt();
+            var role = (Role)r.ReadByte();
+            players.Add(new PlayerRole(playerId, role));
+        }
+
+        r.EnsureEnd();
+        return (winner, reason, players);
+    }
+
     // ChatMessage: playerId: int, text: string (ТЗ 3.5)
     public static byte[] WriteChatMessage(int playerId, string text)
     {
@@ -320,7 +354,8 @@ public static class Packets
     }
 
     // Snapshot: tick: uint, timeLeft: ushort, список из (playerId: int, x, y, aimX, aimY: float, flags: byte),
-    // curseMask: byte (ТЗ 3.5). Число игроков оказывается в датаграмме по смещению 13: заголовок 7 + tick 4 + timeLeft 2.
+    // curseMask: byte, catchProgress: byte — поимка призрака в % (ТЗ 3.5). Число игроков оказывается в датаграмме
+    // по смещению 13: заголовок 7 + tick 4 + timeLeft 2; новое поле стоит в самом конце и это смещение не сдвигает.
     public static byte[] WriteSnapshot(Snapshot snapshot)
     {
         var w = new PacketWriter();
@@ -337,6 +372,7 @@ public static class Packets
             w.WriteByte(p.Flags);
         }
         w.WriteByte(snapshot.CurseMask);            // маска — после списка
+        w.WriteByte(snapshot.CatchProgress);        // поимка — в самом конце
         return w.ToArray();
     }
 
@@ -358,7 +394,8 @@ public static class Packets
             players.Add(new SnapshotPlayer(playerId, x, y, aimX, aimY, flags));
         }
         var curseMask = r.ReadByte();
+        var catchProgress = r.ReadByte();
         r.EnsureEnd();
-        return new Snapshot(tick, timeLeft, players, curseMask);
+        return new Snapshot(tick, timeLeft, players, curseMask, catchProgress);
     }
 }    

@@ -99,7 +99,8 @@ public sealed class GameScreen
         light.Draw(layout, players, map.Items, ghostView);   // темнота поверх карты и игроков
         PlayerRenderer.DrawBeams(players, layout, ghostView);
         PlayerRenderer.DrawNames(players, layout);           // ники поверх темноты
-        HudRenderer.Draw(layout, myRole, myId, current.TimeLeft, current.CurseMask, roster, pingMs);
+        PlayerRenderer.DrawCatchBar(players, layout, current.CatchProgress);
+        HudRenderer.Draw(layout, myRole, myId, current.TimeLeft, current.CurseMask, current.CatchProgress, roster, pingMs);
         return current.TimeLeft == 0 && HudRenderer.DrawRoundOver(layout);
     }
 

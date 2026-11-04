@@ -121,6 +121,19 @@ public static class Ui
         Text(text, bounds.X + 10, bounds.Y + 5, size, color);
     }
 
+    // Полоска прогресса: fraction от 0 до 1 — какая часть залита цветом color
+    public static void ProgressBar(Rectangle bounds, float fraction, Color color)
+    {
+        var round = Roundness(bounds, bounds.Height / 2);
+        Raylib.DrawRectangleRounded(bounds, round, 8, Theme.Field);
+        var filled = bounds with { Width = bounds.Width * Math.Clamp(fraction, 0f, 1f) };
+        if (filled.Width >= bounds.Height) // совсем короткая заливка со скруглением рисуется кляксой — не рисуем
+        {
+            Raylib.DrawRectangleRounded(filled, Roundness(filled, bounds.Height / 2), 8, color);
+        }
+        Raylib.DrawRectangleRoundedLinesEx(bounds, round, 8, 1, Theme.Outline);
+    }
+
     // Строка статуса внизу окна: ошибки красным, остальное серым
     public static void StatusLine(string text, bool isError)
     {

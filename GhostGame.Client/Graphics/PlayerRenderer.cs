@@ -63,6 +63,23 @@ public static class PlayerRenderer
         return MathF.Atan2(p.Aim.Y - p.Position.Y, p.Aim.X - p.Position.X) * 180f / MathF.PI;
     }
 
+    // Красная полоска поимки над призраком — пока его ловят и пока он виден
+    public static void DrawCatchBar(IReadOnlyList<PlayerView> players, GameLayout layout, byte catchProgress)
+    {
+        if (catchProgress == 0)
+        {
+            return;
+        }
+        var nickSize = MathF.Max(14, layout.Cell * 0.36f);
+        foreach (var p in players.Where(p => p.IsGhost))
+        {
+            var center = layout.ToScreen(p.Position);
+            var width = layout.Cell * 1.3f;
+            var top = center.Y - layout.Cell * 0.95f - nickSize - 4 - 12; // над подложкой с ником
+            Ui.ProgressBar(new Rectangle(center.X - width / 2, top, width, 8), catchProgress / 100f, Theme.Error);
+        }
+    }
+
     // Ники рисуются поверх темноты, чтобы читались всегда
     public static void DrawNames(IReadOnlyList<PlayerView> players, GameLayout layout)
     {

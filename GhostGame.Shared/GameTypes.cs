@@ -20,8 +20,9 @@ public record SnapshotPlayer(int PlayerId, float X, float Y, float AimX, float A
     public bool FlashlightOn => (Flags & FlagFlashlight) != 0;
 }
 
-// Снимок раунда: tick, оставшееся время, игроки (призрак — только если видим), маска проклятых предметов
-public record Snapshot(uint Tick, ushort TimeLeft, List<SnapshotPlayer> Players, byte CurseMask)
+// Снимок раунда: tick, оставшееся время, игроки (призрак — только если видим), маска проклятых предметов,
+// сколько призрак уже набрал до поимки — от 0 до 100 %
+public record Snapshot(uint Tick, ushort TimeLeft, List<SnapshotPlayer> Players, byte CurseMask, byte CatchProgress = 0)
 {
     public bool IsCursed(int itemIndex) => (CurseMask & (1 << itemIndex)) != 0;
 }

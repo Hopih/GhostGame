@@ -32,6 +32,8 @@ var lastRoomsRequest = 0L;
 (int RoomId, string Name, int HostId, List<RoomPlayer> Players)? room = null; // последний RoomState
 var chat = new List<string>();
 GameScreen? game = null;
+var roundNicks = new Dictionary<int, string>(); // ники участников раунда на момент GameStart — для экрана итогов
+(Role Winner, GameOverReason Reason, List<PlayerRole> Players)? result = null; // последний GameOver
 uint inputSeq = 0;
 var lastInputAt = 0L;
 var lastPingAt = 0L;
@@ -51,6 +53,7 @@ Assets.Load(); // спрайты и шрифт — только после InitW
 var connectScreen = new ConnectScreen();
 var lobbyScreen = new LobbyScreen();
 var roomScreen = new RoomScreen();
+var resultsScreen = new ResultsScreen();
 
 // Главный цикл кадров. Всё, что связано с окном, — только здесь, в главном потоке (ТЗ 5.3).
 // Поэтому здесь нет await: после await код мог бы продолжиться в другом потоке, а Raylib работает только в этом.
@@ -68,6 +71,7 @@ while (!Raylib.WindowShouldClose())
         case Screen.Lobby: LobbyFrame(now); break;
         case Screen.Room: RoomFrame(); break;
         case Screen.Game: GameFrame(now); break;
+        case Screen.Results: ResultsFrame(); break;
     }
     StatusFrame(now);
     Raylib.EndDrawing();
@@ -135,6 +139,7 @@ void Disconnect(string reason)
     socket = null;
     room = null;
     game = null;
+    result = null;
     rooms.Clear();
     chat.Clear();
     screen = Screen.Connect;
@@ -233,10 +238,17 @@ void HandlePacket(Packet packet)
 
         case PacketType.GameStart:
             var (role, roundSeconds, spawns) = Packets.ReadGameStart(packet.Payload);
-            var nicks = room?.Players.ToDictionary(p => p.PlayerId, p => p.Nick) ?? new Dictionary<int, string>();
-            game = new GameScreen(map, myId, role, roundSeconds, spawns, nicks);
+            roundNicks = room?.Players.ToDictionary(p => p.PlayerId, p => p.Nick) ?? new Dictionary<int, string>();
+            game = new GameScreen(map, myId, role, roundSeconds, spawns, roundNicks);
             inputSeq = 0;
             screen = Screen.Game;
+            break;
+
+        case PacketType.GameOver:
+            // конец раунда (ТЗ 3.7): показываем итоги; Snapshot, если ещё придут, вне экрана игры игнорируются
+            result = Packets.ReadGameOver(packet.Payload);
+            game = null;
+            screen = Screen.Results;
             break;
 
         case PacketType.Snapshot:
@@ -398,6 +410,24 @@ void GameFrame(long now)
     }
 }
 
+void ResultsFrame()
+{
+    if (result is not { } r)
+    {
+        return;
+    }
+
+    if (resultsScreen.Draw(r.Winner, r.Reason, r.Players, roundNicks, myId)) // «В комнату»
+    {
+        result = null;
+        screen = room != null ? Screen.Room : Screen.Lobby;
+        if (room != null)
+        {
+            roomScreen.Focus();
+        }
+    }
+}
+
 void StatusFrame(long now)
 {
     if (screen == Screen.Game || now > statusUntil)
@@ -414,4 +444,5 @@ enum Screen
     Lobby,
     Room,
     Game,
+    Results,
 }

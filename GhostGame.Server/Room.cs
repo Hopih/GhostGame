@@ -8,6 +8,9 @@ public class Room
     public const int MaxPlayers = 5;
     public const int MinPlayersToStart = 3;
     public const ushort RoundSeconds = 240;
+    
+    private const float MaxInLight = 10;
+    private float InLight = 0;
 
     private static int id = 1;
     
@@ -160,6 +163,8 @@ public class Room
 
             var snapshots = new List<SnapshotPlayer>(); // новый список на каждый тик
             List<PlayerState> recipients;
+            List<SnapshotPlayer> huntersView;
+            List<PlayerRole>? gameOverPlayers = null; // не null — призрак пойман, раунд кончился
             lock (roundLock)
             {
                 // этап 1: сдвинуть всех и собрать список для снимка
@@ -193,38 +198,56 @@ public class Room
                         player.Input.AimX, player.Input.AimY, flags));
                 }
 
-                recipients = Round.Values.ToList(); // кому слать — копия, чтобы не трогать Round вне замка
-            }
+                // виден ли призрак хоть одному охотнику — одно значение на весь тик, после того как все сдвинулись
+                var ghost = Round.Values.FirstOrDefault(p => p.Role == Role.Ghost);
+                var ghostVisible = ghost != null && Round.Values.Any(p => p.FlashlightOn
+                    && GhostVisionCheck(map, p.X, p.Y, p.Input.AimX, p.Input.AimY, ghost.X, ghost.Y));
 
-            // виден ли призрак хоть одному охотнику — одно значение на весь тик, после того как все сдвинулись
-            var ghost = Round.Values.FirstOrDefault(p => p.Role == Role.Ghost);
-  
-            var ghostVisible = ghost != null && Round.Values.Any(p => p.FlashlightOn && GhostVisionCheck(map, p.X, p.Y, p.Input.AimX, p.Input.AimY, ghost.X, ghost.Y));
-            var huntersView = snapshots.Where(x => x.PlayerId != ghost.Session.PlayerId).ToList();
-            // этап 2: один снимок на всех; этап 3: каждому, включая самого игрока
-            Snapshot snapshot;
-            if (ghostVisible)
-            {
-                snapshot = new Snapshot(tick, timeLeft, snapshots, 0);
-            }
-            else
-            {
-                snapshot = new Snapshot(tick, timeLeft, huntersView, 0);
-            }
-            
-            foreach (var player in recipients)
-            {
-                if (player.Role == Role.Ghost)
+                // охотникам — без призрака, пока он не в луче (ТЗ 4.4); призрака нет совсем — всем одно и то же
+                huntersView = ghost == null || ghostVisible
+                    ? snapshots
+                    : snapshots.Where(x => x.PlayerId != ghost.Session.PlayerId).ToList();
+
+                // поимка: в луче время копится, вне луча понемногу убывает
+                if (ghostVisible)
                 {
-                    await transport.SendUnreliableAsync(PacketType.Snapshot , Packets.WriteSnapshot(new Snapshot(tick, timeLeft, snapshots, 0)),player.Session.EndPoint);
+                    InLight += TickSeconds;
+                    if (InLight >= MaxInLight)
+                    {
+                        gameOverPlayers = Round.Values.Select(p => new PlayerRole(p.Session.PlayerId, p.Role)).ToList();
+                    }
                 }
                 else
                 {
-                    await transport.SendUnreliableAsync(PacketType.Snapshot, Packets.WriteSnapshot(snapshot),
-                        player.Session.EndPoint);
+                    InLight = Math.Max(InLight - TickSeconds, 0);
                 }
+
+                recipients = Round.Values.ToList(); // кому слать — копия, чтобы не трогать Round вне замка
             }
 
+            // этап 2: призраку — все игроки, охотникам — huntersView; этап 3: каждому свой снимок
+            var ghostSnapshot = Packets.WriteSnapshot(new Snapshot(tick, timeLeft, snapshots, 0));
+            var huntersSnapshot = Packets.WriteSnapshot(new Snapshot(tick, timeLeft, huntersView, 0));
+            foreach (var player in recipients)
+            {
+                await transport.SendUnreliableAsync(PacketType.Snapshot,
+                    player.Role == Role.Ghost ? ghostSnapshot : huntersSnapshot, player.Session.EndPoint);
+            }
+
+            // призрак пойман — GameOver всем участникам раунда: надёжно, с await и уже вне замка
+            if (gameOverPlayers != null)
+            {
+                InGame = false;
+                var payload = Packets.WriteGameOver(Role.Hunter, GameOverReason.GhostCaught, gameOverPlayers);
+                foreach (var player in recipients)
+                {
+                    player.Session.IsReady = false;
+                    await player.Session.Channel.SendAsync(PacketType.GameOver, payload);
+                }
+                await BroadcastStateAsync();
+                Console.WriteLine($"Комната «{Name}»: призрак пойман");
+            }
+        
             if (msLeft == 0)
             {
                 InGame = false; 
