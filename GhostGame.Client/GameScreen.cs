@@ -51,7 +51,7 @@ public sealed class GameScreen
         // До первого Snapshot рисуем всех в точках появления. Охотнику призрака не показываем — туман войны.
         var players = spawns
             .Where(s => myRole == Role.Ghost || s.PlayerId != ghostId)
-            .Select(s => new SnapshotPlayer(s.PlayerId, s.X, s.Y, s.X, s.Y, 0))
+            .Select(s => new SnapshotPlayer(s.PlayerId, s.X, s.Y, s.X, s.Y, 0, 100)) // заряд полный
             .ToList();
         current = new Snapshot(0, roundSeconds, players, 0);
         previous = current;
@@ -152,7 +152,7 @@ public sealed class GameScreen
             }
 
             result.Add(new PlayerView(p.PlayerId, NickOf(p.PlayerId), position, aim, p.FlashlightOn,
-                p.PlayerId == ghostId, p.PlayerId == myId, moving));
+                p.PlayerId == ghostId, p.PlayerId == myId, moving, p.Charge, p.Overheated));
         }
         return result;
     }

@@ -47,12 +47,25 @@ public static class PlayerRenderer
     {
         // за край окна луч не вылезет: GameScreen рисует всё это внутри scissor по окну в мир
         var color = ghostView ? Theme.DangerBeam : Theme.Beam;
-        foreach (var p in players.Where(p => p.FlashlightOn))
+        foreach (var p in players.Where(BeamShown))
         {
             var angle = BeamAngle(p);
             Raylib.DrawCircleSector(layout.ToScreen(p.Position), FlashlightLength * layout.Cell,
                 angle - FlashlightAngle / 2, angle + FlashlightAngle / 2, 24, color);
         }
+    }
+
+    // Виден ли луч в этом кадре. Заряд меньше 20% — фонарь мигает, и чем меньше заряд, тем дольше гаснет.
+    // Только картинка: на сервере фонарь горит, пока не сядет совсем. Призрак тоже видит, что фонарь садится.
+    public static bool BeamShown(PlayerView p)
+    {
+        if (!p.FlashlightOn || p.Charge >= 20)
+        {
+            return p.FlashlightOn;
+        }
+        var phase = (Raylib.GetTime() * 9 + p.PlayerId * 0.37) % 1; // у каждого охотника своё мигание
+        var off = 0.15 + 0.35 * (1 - p.Charge / 20.0);              // доля времени, когда луч погас
+        return phase >= off;
     }
 
     // Направление луча в градусах: 0° — вправо, дальше по часовой (ось Y на экране вниз)

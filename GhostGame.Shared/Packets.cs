@@ -363,14 +363,15 @@ public static class Packets
         w.WriteUInt(snapshot.Tick);
         w.WriteUShort(snapshot.TimeLeft);
         w.WriteByte((byte)snapshot.Players.Count); // список: сначала количество
-        foreach (var p in snapshot.Players)        // потом игроки подряд, по 21 байту
+        foreach (var p in snapshot.Players)        // потом игроки подряд, по 21 байтам
         {
             w.WriteInt(p.PlayerId);
             w.WriteFloat(p.X);
             w.WriteFloat(p.Y);
             w.WriteFloat(p.AimX);
             w.WriteFloat(p.AimY);
-            w.WriteByte(p.Flags);
+            w.WriteByte(p.Flags); 
+            w.WriteByte(p.Charge);
         }
         w.WriteByte(snapshot.CurseMask);            // маска — после списка
         w.WriteByte(snapshot.CatchProgress);        // поимка
@@ -396,7 +397,8 @@ public static class Packets
             var aimX = r.ReadFloat();
             var aimY = r.ReadFloat();
             var flags = r.ReadByte();
-            players.Add(new SnapshotPlayer(playerId, x, y, aimX, aimY, flags));
+            var charge = r.ReadByte();
+            players.Add(new SnapshotPlayer(playerId, x, y, aimX, aimY, flags , charge));
         }
         var curseMask = r.ReadByte();
         var catchProgress = r.ReadByte();

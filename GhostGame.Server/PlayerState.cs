@@ -18,6 +18,8 @@ public class PlayerState
     public ClientSession Session { get; }
     public Role Role { get; }
 
+    public float Battery = 0;
+
     // где стоит, в клетках; меняется каждый тик
     public float X { get; set; }
     public float Y { get; set; }
@@ -36,7 +38,10 @@ public class PlayerState
 
     // горит ли фонарь в этом тике: охотник держит ЛКМ; ставит игровой цикл
     public bool FlashlightOn { get; set; }
+    
+    public bool Muted { get; set; }
 
     // клеток в секунду (ТЗ 4.3)
     public float Speed => Role == Role.Ghost ? 4.5f : 4f;
+    
 }

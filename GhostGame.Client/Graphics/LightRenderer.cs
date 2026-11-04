@@ -51,7 +51,7 @@ public sealed class LightRenderer
             {
                 Hole(at, cell * 1.6f, 200); // у каждого охотника фонарь светит и вокруг него
             }
-            if (p.FlashlightOn)
+            if (PlayerRenderer.BeamShown(p)) // садящийся фонарь мигает и в темноте
             {
                 Beam(at, PlayerRenderer.BeamAngle(p), cell);
             }

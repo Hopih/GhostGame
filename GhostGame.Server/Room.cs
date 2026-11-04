@@ -10,6 +10,7 @@ public class Room
     public const ushort RoundSeconds = 240;
     
     private const float MaxInLight = 3; // столько секунд в лучах нужно, чтобы поймать призрака
+    private const float MaxBattery = 6;
     private float InLight = 0;
 
     private const float CurseSeconds = 3;   // сколько суммарно держать ЛКМ у сундука, чтобы его проклясть
@@ -175,7 +176,8 @@ public class Room
             List<SnapshotPlayer> huntersView;
             GameOverReason? over = null;              // не null — раунд кончился, и вот почему
             List<PlayerRole>? gameOverPlayers = null; // кто кем был — для GameOver
-            byte catchProgress = 0;                   // сколько набрано до поимки, % — уходит в Snapshot
+            byte catchProgress = 0; // сколько набрано до поимки, % — уходит в Snapshot
+            byte chargeProgress = 0;
             byte[] curseProgress;                     // прогресс проклятия каждого сундука, % — уходит в Snapshot
             lock (roundLock)
             {
@@ -204,11 +206,40 @@ public class Room
                     }
 
                     player.PrimaryHeld = input.Primary;
-                    player.FlashlightOn = player.Role == Role.Hunter && player.PrimaryHeld;
+                    player.FlashlightOn = player.Role == Role.Hunter && player.PrimaryHeld && !player.Muted;
                     var flags = player.FlashlightOn ? SnapshotPlayer.FlagFlashlight : (byte)0;
 
+                    if (flags == 1)
+                    {
+                        if (player.Battery >= MaxBattery)
+                        {
+                            flags = 0;
+                            player.Muted = true;
+                        }
+                        else
+                        {
+                            player.Battery += TickSeconds;
+                        }
+                    }
+                    if (player.Muted)
+                    {
+                        flags = 0;
+                        flags |= SnapshotPlayer.FlashlightOverheated;
+                        if (player.Battery == 0)
+                        {
+                            player.Muted = false;
+                        }
+                    }
+
+                    if ((flags & SnapshotPlayer.FlagFlashlight) == 0)
+                    {
+                        player.Battery = Math.Max(0, player.Battery - TickSeconds);
+                    }
+
+                    chargeProgress = (byte)((MaxBattery - player.Battery) / MaxBattery * 100);
+                    
                     snapshots.Add(new SnapshotPlayer(player.Session.PlayerId, player.X, player.Y,
-                        player.Input.AimX, player.Input.AimY, flags));
+                        player.Input.AimX, player.Input.AimY, flags , chargeProgress));
                 }
 
                 // виден ли призрак хоть одному охотнику — одно значение на весь тик, после того как все сдвинулись

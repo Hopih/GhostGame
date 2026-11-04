@@ -48,14 +48,14 @@ public static class MenuBackdrop
         var hunterAt = layout.ToCells(new Vector2(width * 0.1f, height * 1.03f));
         var sweep = (-55 + 28 * MathF.Sin(t * 0.6f)) * MathF.PI / 180;
         var hunter = new PlayerView(-1, "", hunterAt, hunterAt + new Vector2(MathF.Cos(sweep), MathF.Sin(sweep)) * 4,
-            FlashlightOn: true, IsGhost: false, IsMe: false, Moving: false);
+            FlashlightOn: true, IsGhost: false, IsMe: false, Moving: false, Charge: 100, Overheated: false);
 
         // призрак плывёт по экрану восьмёркой — сквозь стены, ему можно
         var ghostAt = layout.ToCells(new Vector2(width * (0.5f + 0.34f * MathF.Sin(t * 0.19f)),
             height * (0.5f + 0.22f * MathF.Sin(t * 0.38f))));
         var heading = MathF.Cos(t * 0.19f); // куда сейчас летит по горизонтали — туда и смотрит
         var ghost = new PlayerView(-2, "", ghostAt, ghostAt + new Vector2(heading, 0), FlashlightOn: false,
-            IsGhost: true, IsMe: false, Moving: false);
+            IsGhost: true, IsMe: false, Moving: false, Charge: 100, Overheated: false);
 
         MapRenderer.Draw(map, layout, Nothing, NoCursing, t);
         Light.Draw(layout, new[] { hunter }, map.Items, lamps, ghostView: false);

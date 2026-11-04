@@ -45,6 +45,18 @@ public static class HudRenderer
             myRole == Role.Ghost ? Theme.Error : Theme.Accent);
         y += 54;
 
+        // охотнику — заряд своего фонаря; сел — красная полоска, пока не остынет до конца
+        var me = players.FirstOrDefault(p => p.IsMe);
+        if (myRole == Role.Hunter && me.IsMe)
+        {
+            var low = !me.Overheated && me.Charge < 20;
+            Ui.Text(me.Overheated ? "ФОНАРЬ ПЕРЕГРЕЛСЯ — ОСТЫВАЕТ" : $"ФОНАРЬ  {me.Charge}%", x, y, 16,
+                me.Overheated || low ? Theme.Error : Theme.Muted);
+            Ui.ProgressBar(new Rectangle(x, y + 22, width, 14), me.Charge / 100f,
+                me.Overheated ? Theme.Error : low ? Theme.Accent : Theme.Flame);
+            y += 54;
+        }
+
         // проклятые предметы: сундук — цел, мимик — проклят, под сундуком — сколько уже набрано;
         // тот, что проклинают прямо сейчас, мигает. Призраку для победы нужно 3 (ТЗ 6).
         var anyCursing = cursing.Any(c => c);

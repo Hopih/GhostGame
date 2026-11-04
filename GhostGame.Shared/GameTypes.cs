@@ -13,11 +13,16 @@ public record InputState(sbyte MoveX, sbyte MoveY, float AimX, float AimY, byte 
 }
 
 // Элемент списка игроков в Snapshot
-public record SnapshotPlayer(int PlayerId, float X, float Y, float AimX, float AimY, byte Flags)
+public record SnapshotPlayer(int PlayerId, float X, float Y, float AimX, float AimY, byte Flags , byte Charge)
 {
     public const byte FlagFlashlight = 1; // бит 0 flags: фонарь включён
 
+    public const byte FlashlightOverheated = 2;
+    
     public bool FlashlightOn => (Flags & FlagFlashlight) != 0;
+    
+    public bool Overheated => (Flags & FlashlightOverheated) != 0;
+    
 }
 
 // Снимок раунда: tick, оставшееся время, игроки (призрак — только если видим), маска проклятых предметов,
