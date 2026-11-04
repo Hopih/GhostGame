@@ -1,6 +1,7 @@
 ﻿using System.Net;
 using System.Net.Sockets;
 using GhostGame.Client;
+using GhostGame.Client.Audio;
 using GhostGame.Client.Graphics;
 using GhostGame.Client.Screens;
 using GhostGame.Shared;
@@ -48,6 +49,8 @@ Raylib.SetWindowMinSize(1240, 780);
 Raylib.SetTargetFPS(60);
 Raylib.SetExitKey(KeyboardKey.Null); // Esc не закрывает окно
 Assets.Load(); // спрайты и шрифт — только после InitWindow
+MenuBackdrop.Init(map); // фон меню — тот же особняк
+Sfx.Load();             // звуки — тоже после InitWindow
 
 // Экраны меню: только рисуют и сообщают, что нажали. Что отправить серверу, решает этот файл.
 var connectScreen = new ConnectScreen();
@@ -60,6 +63,7 @@ var resultsScreen = new ResultsScreen();
 while (!Raylib.WindowShouldClose())
 {
     var now = Environment.TickCount64;
+    Sfx.Update();
     HandlePackets();
     CheckConnection(now);
 
@@ -85,6 +89,7 @@ if (connected && transport != null)
         transport.SendUnreliableAsync(PacketType.ClientDisconnect, Array.Empty<byte>(), server).Wait();
     }
 }
+Sfx.Unload();
 Raylib.CloseWindow();
 socket?.Close();
 
@@ -206,6 +211,7 @@ void HandlePacket(Packet packet)
                 helloSentAt = -1; // ответ на Hello: можно ввести другой ник
             }
             ShowStatus($"Ошибка: {message}");
+            Sfx.Play(Sfx.Error, 0.6f);
             break;
 
         case PacketType.ServerDisconnect:
@@ -234,6 +240,7 @@ void HandlePacket(Packet packet)
             {
                 chat.RemoveAt(0);
             }
+            Sfx.Play(Sfx.Chat, 0.5f);
             break;
 
         case PacketType.GameStart:
@@ -249,6 +256,8 @@ void HandlePacket(Packet packet)
             result = Packets.ReadGameOver(packet.Payload);
             game = null;
             screen = Screen.Results;
+            var won = result.Value.Players.FirstOrDefault(p => p.PlayerId == myId)?.Role == result.Value.Winner;
+            Sfx.Play(won ? Sfx.Win : Sfx.Lose, 0.8f);
             break;
 
         case PacketType.Snapshot:
@@ -401,6 +410,11 @@ void GameFrame(long now)
     {
         lastInputAt = now;
         SendUnreliable(PacketType.Input, Packets.WriteInput(++inputSeq, game.ReadInput()));
+    }
+
+    if (Raylib.IsKeyPressed(KeyboardKey.M)) // в игре полей ввода нет, поэтому M можно отдать под звук
+    {
+        Sfx.ToggleMute();
     }
 
     if (game.Draw(pingMs)) // время вышло и нажали «В комнату»

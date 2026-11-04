@@ -1,4 +1,5 @@
 using System.Numerics;
+using GhostGame.Client.Audio;
 using GhostGame.Client.Graphics;
 using GhostGame.Shared;
 using Raylib_cs;
@@ -24,6 +25,7 @@ public sealed class GameScreen
     private readonly IReadOnlyDictionary<int, string> nicks;
     private readonly List<RosterEntry> roster;
     private readonly LightRenderer light = new();
+    private readonly GameAudio audio;
     private readonly List<Vector2> lamps;  // факелы и светящиеся чаши — постоянные пятна света
     private Snapshot previous;  // предпоследний применённый Snapshot
     private Snapshot current;   // последний применённый Snapshot
@@ -58,6 +60,7 @@ public sealed class GameScreen
         var me = spawns.First(s => s.PlayerId == myId);
         focus = new Vector2(me.X, me.Y);
         lamps = MapRenderer.FindLamps(map);
+        audio = new GameAudio(map, myRole);
     }
 
     public Role MyRole => myRole;
@@ -108,6 +111,7 @@ public sealed class GameScreen
         // всё, что в мире, рисуем только внутри окна в мир — карта больше него (scissor обрезает остальное)
         var view = layout.Viewport;
         var cursing = CursingNow();
+        audio.Update(players, current, cursing, catching: current.CatchProgress > previous.CatchProgress, Raylib.GetFrameTime());
         Raylib.BeginScissorMode((int)view.X, (int)view.Y, (int)view.Width, (int)view.Height);
         MapRenderer.Draw(map, layout, current, cursing, time);
         PlayerRenderer.DrawBodies(players, layout, time);

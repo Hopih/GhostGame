@@ -44,7 +44,7 @@ public static class Assets
 
     // Стандартный шрифт Raylib знает только латиницу — русский текст был бы «?».
     // Поэтому грузим системный TTF и просим в нём латиницу, кириллицу и несколько знаков.
-    // Размер побольше (48), чтобы крупные заголовки не были мыльными.
+    // Размер побольше (72), чтобы крупные заголовки не были мыльными.
     private static Font LoadFont()
     {
         var codepoints = Enumerable.Range(32, 95)                 // пробел, латиница, цифры, знаки
@@ -56,7 +56,7 @@ public static class Assets
         {
             if (File.Exists(path))
             {
-                var font = Raylib.LoadFontEx(path, 48, codepoints, codepoints.Length);
+                var font = Raylib.LoadFontEx(path, 72, codepoints, codepoints.Length);
                 Raylib.SetTextureFilter(font.Texture, TextureFilter.Bilinear);
                 return font;
             }

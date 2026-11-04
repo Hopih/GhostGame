@@ -9,6 +9,9 @@ public static class Theme
     // --- меню ---
     public static readonly Color Background = new(30, 21, 30, 255);
     public static readonly Color Veil = new(30, 21, 30, 220);            // тёмная вуаль поверх пола на фоне меню
+    public static readonly Color MenuVeil = new(20, 13, 20, 70);         // лёгкая вуаль поверх живого особняка
+    public static readonly Color GhostGlow = new(210, 225, 255, 70);     // бледное сияние вокруг призрака
+    public static readonly Color TitleShadow = new(0, 0, 0, 170);
     public static readonly Color Panel = new(46, 32, 42, 245);
     public static readonly Color PanelBorder = new(84, 56, 70, 255);
     public static readonly Color Row = new(60, 42, 54, 255);             // строка списка

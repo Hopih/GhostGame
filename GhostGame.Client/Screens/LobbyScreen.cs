@@ -88,10 +88,10 @@ public sealed class LobbyScreen
         Ui.Text("Как играть", rules.X + 24, rules.Y + 18, 28);
         var y = rules.Y + 70;
         Assets.DrawSprite(Sprites.Ghost, new Rectangle(rules.X + 24, y, 48, 48), Theme.GhostTint);
-        y += Ui.Paragraph("Призрак проклинает сундуки: рядом с сундуком держать ЛКМ 3 с. Проклял 3 из 5 или продержался до конца раунда — победа.",
+        y += Ui.Paragraph("Призрак проклинает сундуки: рядом с сундуком держать ЛКМ 3 с, можно с перерывами. Проклял 3 из 5 или продержался до конца раунда — победа.",
             rules.X + 86, y, rules.Width - 110, 18, Theme.Text) + 14;
         Assets.DrawSprite(Sprites.Hunter(3), new Rectangle(rules.X + 24, y, 48, 48));
-        y += Ui.Paragraph("Охотники ищут его в темноте: 2 с в лучах фонарей — призрак пойман.",
+        y += Ui.Paragraph("Охотники ищут его в темноте: 3 с в лучах фонарей — призрак пойман. За шкафами и колоннами луч не достаёт.",
             rules.X + 86, y, rules.Width - 110, 18, Theme.Text) + 14;
         Ui.Paragraph("В комнате 3–5 игроков, раунд — 4 минуты.", rules.X + 24, y + 10, rules.Width - 48, 18, Theme.Muted);
 

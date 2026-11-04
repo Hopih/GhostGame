@@ -1,4 +1,5 @@
 using System.Numerics;
+using GhostGame.Client.Audio;
 using Raylib_cs;
 
 namespace GhostGame.Client.Graphics;
@@ -18,6 +19,17 @@ public static class Ui
     public static void TextCentered(string text, float centerX, float y, float size = 22, Color? color = null)
     {
         Text(text, centerX - MeasureText(text, size) / 2, y, size, color);
+    }
+
+    // Крупный заголовок: мягкая тень и золотая черта под текстом
+    public static void Title(string text, float centerX, float y, float size)
+    {
+        var width = MeasureText(text, size);
+        var x = centerX - width / 2;
+        Text(text, x + 3, y + 5, size, Theme.TitleShadow);
+        Text(text, x, y, size, Theme.Text);
+        var line = width * 0.35f;
+        Raylib.DrawRectangleRounded(new Rectangle(centerX - line / 2, y + size + 10, line, 4), 1, 4, Theme.Accent);
     }
 
     public static float MeasureText(string text, float size = 22)
@@ -58,9 +70,16 @@ public static class Ui
         return new Rectangle((Raylib.GetScreenWidth() - width) / 2, (Raylib.GetScreenHeight() - height) / 2, width, height);
     }
 
-    // Фон меню: пол подземелья крупными плитками под тёмной вуалью
+    // Фон меню: живой особняк (MenuBackdrop) под лёгкой вуалью, чтобы панели читались.
+    // Если особняк ещё не загружен — просто пол крупными плитками.
     public static void Backdrop()
     {
+        if (MenuBackdrop.IsReady)
+        {
+            MenuBackdrop.Draw();
+            Raylib.DrawRectangle(0, 0, Raylib.GetScreenWidth(), Raylib.GetScreenHeight(), Theme.MenuVeil);
+            return;
+        }
         const int tile = Assets.SpriteSize * 4;
         for (var y = 0; y * tile < Raylib.GetScreenHeight(); y++)
         {
@@ -101,7 +120,12 @@ public static class Ui
 
         var textColor = !enabled ? Theme.Muted : primary ? Theme.Outline : Theme.Text;
         TextCentered(label, face.X + face.Width / 2, face.Y + (face.Height - size) / 2 - 1, size, textColor);
-        return hover && Raylib.IsMouseButtonPressed(MouseButton.Left);
+        var clicked = hover && Raylib.IsMouseButtonPressed(MouseButton.Left);
+        if (clicked)
+        {
+            Sfx.Play(Sfx.Click, 0.5f);
+        }
+        return clicked;
     }
 
     // Строка списка, по которой можно кликнуть. Рисует только подложку, содержимое рисует вызывающий.

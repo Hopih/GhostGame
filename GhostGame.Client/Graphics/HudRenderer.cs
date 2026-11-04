@@ -1,4 +1,5 @@
 using System.Numerics;
+using GhostGame.Client.Audio;
 using GhostGame.Shared;
 using Raylib_cs;
 
@@ -90,10 +91,11 @@ public static class HudRenderer
 
         // пинг и подсказка
         Ui.Text($"пинг {(pingMs < 0 ? "—" : $"{pingMs} мс")}", x, y, 18, Theme.Muted);
+        Ui.Text(Sfx.Muted ? "звук выключен" : "звук включён", x + width / 2, y, 18, Sfx.Muted ? Theme.Error : Theme.Muted);
         y += 30;
         var hint = myRole == Role.Ghost
-            ? "WASD — ходить. ЛКМ рядом с сундуком 3 с — проклясть. Красное — лучи фонарей, туда нельзя."
-            : "WASD — ходить. Мышь — куда светить. ЛКМ — фонарь.";
+            ? "WASD — ходить. ЛКМ рядом с сундуком 3 с — проклясть. Красное — лучи фонарей, туда нельзя. M — звук."
+            : "WASD — ходить. Мышь — куда светить. ЛКМ — фонарь. M — звук.";
         Ui.Paragraph(hint, x, y, width, 17, Theme.Muted);
     }
 
