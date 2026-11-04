@@ -100,6 +100,7 @@ public class Room
         lock (roundLock)
         {
             Round.Clear();
+            InLight = 0;
             foreach (var s in spawns)
             {
                 var role = s.PlayerId == ghost.PlayerId ? Role.Ghost : Role.Hunter;
@@ -165,6 +166,7 @@ public class Room
             List<PlayerState> recipients;
             List<SnapshotPlayer> huntersView;
             List<PlayerRole>? gameOverPlayers = null; // не null — призрак пойман, раунд кончился
+            byte catchProgress = 0;                   // сколько набрано до поимки, % — уходит в Snapshot
             lock (roundLock)
             {
                 // этап 1: сдвинуть всех и собрать список для снимка
@@ -221,13 +223,14 @@ public class Room
                 {
                     InLight = Math.Max(InLight - TickSeconds, 0);
                 }
+                catchProgress = (byte)Math.Min(100f, InLight / MaxInLight * 100);
 
                 recipients = Round.Values.ToList(); // кому слать — копия, чтобы не трогать Round вне замка
             }
 
             // этап 2: призраку — все игроки, охотникам — huntersView; этап 3: каждому свой снимок
-            var ghostSnapshot = Packets.WriteSnapshot(new Snapshot(tick, timeLeft, snapshots, 0));
-            var huntersSnapshot = Packets.WriteSnapshot(new Snapshot(tick, timeLeft, huntersView, 0));
+            var ghostSnapshot = Packets.WriteSnapshot(new Snapshot(tick, timeLeft, snapshots, 0, catchProgress));
+            var huntersSnapshot = Packets.WriteSnapshot(new Snapshot(tick, timeLeft, huntersView, 0, catchProgress));
             foreach (var player in recipients)
             {
                 await transport.SendUnreliableAsync(PacketType.Snapshot,
@@ -250,7 +253,12 @@ public class Room
         
             if (msLeft == 0)
             {
-                InGame = false; 
+                InGame = false;
+                foreach (var player in recipients)
+                {
+                    player.Session.IsReady = false;
+                }
+                await BroadcastStateAsync();
                 Console.WriteLine($"Комната «{Name}»: время раунда вышло");
             }
         }
