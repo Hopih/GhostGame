@@ -9,8 +9,14 @@ public class Room
     public const int MinPlayersToStart = 3;
     public const ushort RoundSeconds = 240;
     
-    private const float MaxInLight = 10;
+    private const float MaxInLight = 3; // столько секунд в лучах нужно, чтобы поймать призрака
     private float InLight = 0;
+
+    private const float CurseSeconds = 3;   // сколько суммарно держать ЛКМ у сундука, чтобы его проклясть
+    private const float CurseDistance = 1;  // насколько близко к сундуку надо стоять, в клетках
+    private const int CursesToWin = 3;      // столько проклятых сундуков — победа призрака
+    private byte curseMask;                 // какие сундуки прокляты: бит i — сундук i + 1
+    private readonly float[] curseSeconds = new float[Snapshot.ItemCount]; // прогресс у каждого сундука; не сбрасывается
 
     private static int id = 1;
     
@@ -101,6 +107,8 @@ public class Room
         {
             Round.Clear();
             InLight = 0;
+            curseMask = 0;                  // новый раунд — все сундуки снова целые
+            Array.Clear(curseSeconds);
             foreach (var s in spawns)
             {
                 var role = s.PlayerId == ghost.PlayerId ? Role.Ghost : Role.Hunter;
@@ -165,8 +173,10 @@ public class Room
             var snapshots = new List<SnapshotPlayer>(); // новый список на каждый тик
             List<PlayerState> recipients;
             List<SnapshotPlayer> huntersView;
-            List<PlayerRole>? gameOverPlayers = null; // не null — призрак пойман, раунд кончился
+            GameOverReason? over = null;              // не null — раунд кончился, и вот почему
+            List<PlayerRole>? gameOverPlayers = null; // кто кем был — для GameOver
             byte catchProgress = 0;                   // сколько набрано до поимки, % — уходит в Snapshot
+            byte[] curseProgress;                     // прогресс проклятия каждого сундука, % — уходит в Snapshot
             lock (roundLock)
             {
                 // этап 1: сдвинуть всех и собрать список для снимка
@@ -193,7 +203,8 @@ public class Room
                         player.Y = newY;
                     }
 
-                    player.FlashlightOn = player.Role == Role.Hunter && input.Primary;
+                    player.PrimaryHeld = input.Primary;
+                    player.FlashlightOn = player.Role == Role.Hunter && player.PrimaryHeld;
                     var flags = player.FlashlightOn ? SnapshotPlayer.FlagFlashlight : (byte)0;
 
                     snapshots.Add(new SnapshotPlayer(player.Session.PlayerId, player.X, player.Y,
@@ -216,7 +227,7 @@ public class Room
                     InLight += TickSeconds;
                     if (InLight >= MaxInLight)
                     {
-                        gameOverPlayers = Round.Values.Select(p => new PlayerRole(p.Session.PlayerId, p.Role)).ToList();
+                        over = GameOverReason.GhostCaught;
                     }
                 }
                 else
@@ -225,43 +236,84 @@ public class Room
                 }
                 catchProgress = (byte)Math.Min(100f, InLight / MaxInLight * 100);
 
+                // проклятие: призрак держит ЛКМ у непроклятого сундука и сейчас не в луче — прогресс этого сундука растёт.
+                // Прервали — не страшно: прогресс у каждого сундука свой и копится, пока сундук не проклят.
+                if (ghost != null && over == null && ghost.PrimaryHeld && !ghostVisible)
+                {
+                    var item = NearestUncursedItem(map, ghost);
+                    if (item >= 0)
+                    {
+                        curseSeconds[item] += TickSeconds;
+                        if (curseSeconds[item] >= CurseSeconds)
+                        {
+                            curseMask |= (byte)(1 << item);
+                            if (BitOperations.PopCount(curseMask) >= CursesToWin)
+                            {
+                                over = GameOverReason.Cursed;
+                            }
+                        }
+                    }
+                }
+                curseProgress = curseSeconds.Select(s => (byte)Math.Min(100f, s / CurseSeconds * 100)).ToArray();
+
+                if (msLeft == 0)
+                {
+                    over ??= GameOverReason.TimeUp; // время вышло, а раунд ещё не кончился иначе — призрак продержался
+                }
+                if (over != null)
+                {
+                    gameOverPlayers = Round.Values.Select(p => new PlayerRole(p.Session.PlayerId, p.Role)).ToList();
+                }
+
                 recipients = Round.Values.ToList(); // кому слать — копия, чтобы не трогать Round вне замка
             }
 
             // этап 2: призраку — все игроки, охотникам — huntersView; этап 3: каждому свой снимок
-            var ghostSnapshot = Packets.WriteSnapshot(new Snapshot(tick, timeLeft, snapshots, 0, catchProgress));
-            var huntersSnapshot = Packets.WriteSnapshot(new Snapshot(tick, timeLeft, huntersView, 0, catchProgress));
+            var ghostSnapshot = Packets.WriteSnapshot(new Snapshot(tick, timeLeft, snapshots, curseMask, catchProgress, curseProgress));
+            var huntersSnapshot = Packets.WriteSnapshot(new Snapshot(tick, timeLeft, huntersView, curseMask, catchProgress, curseProgress));
             foreach (var player in recipients)
             {
                 await transport.SendUnreliableAsync(PacketType.Snapshot,
                     player.Role == Role.Ghost ? ghostSnapshot : huntersSnapshot, player.Session.EndPoint);
             }
 
-            // призрак пойман — GameOver всем участникам раунда: надёжно, с await и уже вне замка
-            if (gameOverPlayers != null)
+            // раунд кончился (пойман, проклято 3 сундука или вышло время) — GameOver всем участникам раунда:
+            // надёжно, с await и уже вне замка; потом RoomState со сброшенной готовностью (ТЗ 3.7)
+            if (over != null && gameOverPlayers != null)
             {
                 InGame = false;
-                var payload = Packets.WriteGameOver(Role.Hunter, GameOverReason.GhostCaught, gameOverPlayers);
+                var winner = over == GameOverReason.GhostCaught ? Role.Hunter : Role.Ghost;
+                var payload = Packets.WriteGameOver(winner, over.Value, gameOverPlayers);
                 foreach (var player in recipients)
                 {
                     player.Session.IsReady = false;
                     await player.Session.Channel.SendAsync(PacketType.GameOver, payload);
                 }
                 await BroadcastStateAsync();
-                Console.WriteLine($"Комната «{Name}»: призрак пойман");
-            }
-        
-            if (msLeft == 0)
-            {
-                InGame = false;
-                foreach (var player in recipients)
-                {
-                    player.Session.IsReady = false;
-                }
-                await BroadcastStateAsync();
-                Console.WriteLine($"Комната «{Name}»: время раунда вышло");
+                Console.WriteLine($"Комната «{Name}»: раунд окончен — {over}, победил {(winner == Role.Ghost ? "призрак" : "охотники")}");
             }
         }
+    }
+
+    // Номер ближайшего непроклятого сундука не дальше CurseDistance от призрака, или -1, если рядом такого нет
+    private int NearestUncursedItem(GameMap map, PlayerState ghost)
+    {
+        var best = -1;
+        var bestDistance = CurseDistance;
+        for (var i = 0; i < map.Items.Count; i++)
+        {
+            if ((curseMask & (1 << i)) != 0)
+            {
+                continue; // уже проклят
+            }
+            var distance = Vector2.Distance(new Vector2(ghost.X, ghost.Y), map.Items[i]);
+            if (distance <= bestDistance)
+            {
+                best = i;
+                bestDistance = distance;
+            }
+        }
+        return best;
     }
     public bool GhostVisionCheck(GameMap map, float posX, float posY, float aimX , float aimY , float ghostX , float ghostY)
     {

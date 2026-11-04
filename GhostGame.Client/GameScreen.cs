@@ -107,8 +107,9 @@ public sealed class GameScreen
 
         // всё, что в мире, рисуем только внутри окна в мир — карта больше него (scissor обрезает остальное)
         var view = layout.Viewport;
+        var cursing = CursingNow();
         Raylib.BeginScissorMode((int)view.X, (int)view.Y, (int)view.Width, (int)view.Height);
-        MapRenderer.Draw(map, layout, current.CurseMask, time);
+        MapRenderer.Draw(map, layout, current, cursing, time);
         PlayerRenderer.DrawBodies(players, layout, time);
         Raylib.EndScissorMode(); // темнота рисуется в отдельную текстуру, а scissor ей мешал бы; ложится ровно в окно
         light.Draw(layout, players, map.Items, lamps, ghostView);
@@ -119,8 +120,7 @@ public sealed class GameScreen
         Raylib.EndScissorMode();
         Raylib.DrawRectangleRoundedLinesEx(view, 0.01f, 4, 2, Theme.PanelBorder);
 
-        HudRenderer.Draw(layout, map, players, myRole, myId, current.TimeLeft, current.CurseMask, current.CatchProgress,
-            roster, pingMs);
+        HudRenderer.Draw(layout, map, players, myRole, myId, current, cursing, roster, pingMs);
         return current.TimeLeft == 0 && HudRenderer.DrawRoundOver(layout);
     }
 
@@ -149,6 +149,18 @@ public sealed class GameScreen
 
             result.Add(new PlayerView(p.PlayerId, NickOf(p.PlayerId), position, aim, p.FlashlightOn,
                 p.PlayerId == ghostId, p.PlayerId == myId, moving));
+        }
+        return result;
+    }
+
+    // Какие сундуки проклинают прямо сейчас: прогресс вырос с прошлого снимка. Это видят все — сундук мигает,
+    // и охотники могут успеть прибежать.
+    private bool[] CursingNow()
+    {
+        var result = new bool[Snapshot.ItemCount];
+        for (var i = 0; i < result.Length; i++)
+        {
+            result[i] = !current.IsCursed(i) && current.CurseProgressOf(i) > previous.CurseProgressOf(i);
         }
         return result;
     }

@@ -7,9 +7,13 @@ namespace GhostGame.Client.Graphics;
 // Панель справа от карты: роль, таймер, поимка, проклятые предметы, мини-карта, игроки, пинг, подсказка
 public static class HudRenderer
 {
+    // snapshot — время, поимка, маска и прогресс проклятий; cursing[i] — сундук i проклинают прямо сейчас
     public static void Draw(GameLayout layout, GameMap map, IReadOnlyList<PlayerView> players, Role myRole, int myId,
-        ushort timeLeft, byte curseMask, byte catchProgress, IReadOnlyList<RosterEntry> roster, long pingMs)
+        Snapshot snapshot, IReadOnlyList<bool> cursing, IReadOnlyList<RosterEntry> roster, long pingMs)
     {
+        var timeLeft = snapshot.TimeLeft;
+        var curseMask = snapshot.CurseMask;
+        var catchProgress = snapshot.CatchProgress;
         var panel = layout.Panel;
         Ui.Panel(panel);
         var x = panel.X + 16;
@@ -40,18 +44,29 @@ public static class HudRenderer
             myRole == Role.Ghost ? Theme.Error : Theme.Accent);
         y += 54;
 
-        // проклятые предметы: сундук — цел, мимик — проклят; призраку для победы нужно 3 (ТЗ 6)
-        Ui.Text($"ПРОКЛЯТО  {BitOperations.PopCount(curseMask)} / 3", x, y, 16, Theme.Muted);
+        // проклятые предметы: сундук — цел, мимик — проклят, под сундуком — сколько уже набрано;
+        // тот, что проклинают прямо сейчас, мигает. Призраку для победы нужно 3 (ТЗ 6).
+        var anyCursing = cursing.Any(c => c);
+        Ui.Text(anyCursing ? $"ПРОКЛИНАЮТ!  {BitOperations.PopCount(curseMask)} / 3" : $"ПРОКЛЯТО  {BitOperations.PopCount(curseMask)} / 3",
+            x, y, 16, anyCursing ? Theme.CurseGlow with { A = 255 } : Theme.Muted);
         var icon = MathF.Min(40, (width - 4 * 6) / 5);
-        for (var i = 0; i < 5; i++)
+        var blink = Raylib.GetTime() % 0.5 < 0.25;
+        for (var i = 0; i < Snapshot.ItemCount; i++)
         {
-            var cursed = (curseMask & (1 << i)) != 0;
-            Assets.DrawSprite(cursed ? Sprites.Mimic : Sprites.Chest, new Rectangle(x + i * (icon + 6), y + 22, icon, icon));
+            var cursed = snapshot.IsCursed(i);
+            var slot = new Rectangle(x + i * (icon + 6), y + 22, icon, icon);
+            Assets.DrawSprite(cursed ? Sprites.Mimic : Sprites.Chest, slot,
+                cursing[i] && blink ? Theme.CurseGlow with { A = 255 } : Color.White);
+            var progress = snapshot.CurseProgressOf(i);
+            if (!cursed && progress > 0)
+            {
+                Ui.ProgressBar(new Rectangle(slot.X, slot.Y + icon + 3, icon, 6), progress / 100f, Theme.CurseGlow with { A = 255 });
+            }
         }
-        y += 22 + icon + 20;
+        y += 22 + icon + 26;
 
         // мини-карта всего особняка
-        y += DrawMinimap(layout, map, players, curseMask, x, y, width) + 16;
+        y += DrawMinimap(layout, map, players, curseMask, cursing, x, y, width) + 16;
 
         // игроки раунда
         Ui.Text("ИГРОКИ", x, y, 16, Theme.Muted);
@@ -86,7 +101,7 @@ public static class HudRenderer
     // Игроки — те же, что и на экране, поэтому охотник видит на ней призрака, только пока тот в луче (туман войны).
     // Возвращает высоту, которую заняла.
     private static float DrawMinimap(GameLayout layout, GameMap map, IReadOnlyList<PlayerView> players, byte curseMask,
-        float x, float y, float width)
+        IReadOnlyList<bool> cursing, float x, float y, float width)
     {
         Ui.Text("КАРТА", x, y, 16, Theme.Muted);
         var top = y + 22;
@@ -115,7 +130,13 @@ public static class HudRenderer
         for (var i = 0; i < map.Items.Count; i++)
         {
             var cursed = (curseMask & (1 << i)) != 0;
-            Raylib.DrawCircleV(At(map.Items[i]), dot * 1.3f, cursed ? Theme.CurseGlow : Theme.Accent);
+            if (cursing[i])
+            {
+                // сундук проклинают — на мини-карте он пульсирует: охотники видят, куда бежать
+                var ring = dot * (2 + 2 * (float)(Raylib.GetTime() * 3 % 1));
+                Raylib.DrawCircleLinesV(At(map.Items[i]), ring, Theme.CurseGlow with { A = 255 });
+            }
+            Raylib.DrawCircleV(At(map.Items[i]), dot * 1.3f, cursed || cursing[i] ? Theme.CurseGlow with { A = 255 } : Theme.Accent);
         }
         foreach (var p in players)
         {

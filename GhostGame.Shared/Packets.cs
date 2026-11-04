@@ -354,8 +354,9 @@ public static class Packets
     }
 
     // Snapshot: tick: uint, timeLeft: ushort, список из (playerId: int, x, y, aimX, aimY: float, flags: byte),
-    // curseMask: byte, catchProgress: byte — поимка призрака в % (ТЗ 3.5). Число игроков оказывается в датаграмме
-    // по смещению 13: заголовок 7 + tick 4 + timeLeft 2; новое поле стоит в самом конце и это смещение не сдвигает.
+    // curseMask: byte, catchProgress: byte — поимка призрака в %, curseProgress: 5 × byte — проклятие каждого
+    // предмета в % (ТЗ 3.5). Число игроков оказывается в датаграмме по смещению 13: заголовок 7 + tick 4 + timeLeft 2;
+    // новые поля стоят в самом конце и это смещение не сдвигают.
     public static byte[] WriteSnapshot(Snapshot snapshot)
     {
         var w = new PacketWriter();
@@ -372,7 +373,11 @@ public static class Packets
             w.WriteByte(p.Flags);
         }
         w.WriteByte(snapshot.CurseMask);            // маска — после списка
-        w.WriteByte(snapshot.CatchProgress);        // поимка — в самом конце
+        w.WriteByte(snapshot.CatchProgress);        // поимка
+        for (var i = 0; i < Snapshot.ItemCount; i++) // проклятие каждого предмета — в самом конце, всегда 5 байт
+        {
+            w.WriteByte(snapshot.CurseProgressOf(i));
+        }
         return w.ToArray();
     }
 
@@ -395,7 +400,12 @@ public static class Packets
         }
         var curseMask = r.ReadByte();
         var catchProgress = r.ReadByte();
+        var curseProgress = new byte[Snapshot.ItemCount];
+        for (var i = 0; i < curseProgress.Length; i++)
+        {
+            curseProgress[i] = r.ReadByte();
+        }
         r.EnsureEnd();
-        return new Snapshot(tick, timeLeft, players, curseMask, catchProgress);
+        return new Snapshot(tick, timeLeft, players, curseMask, catchProgress, curseProgress);
     }
 }    

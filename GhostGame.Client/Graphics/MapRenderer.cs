@@ -15,7 +15,8 @@ public static class MapRenderer
         Top,
     }
 
-    public static void Draw(GameMap map, GameLayout layout, byte curseMask, double time)
+    // snapshot — откуда маска и прогресс проклятий; cursing[i] — сундук i проклинают прямо сейчас
+    public static void Draw(GameMap map, GameLayout layout, Snapshot snapshot, IReadOnlyList<bool> cursing, double time)
     {
         var (left, top, right, bottom) = layout.VisibleCells();
 
@@ -52,7 +53,7 @@ public static class MapRenderer
                 }
             }
         }
-        DrawItems(map, layout, curseMask, time);
+        DrawItems(map, layout, snapshot, cursing, time);
     }
 
     // Где на карте источники света: факел светит в комнату под собой, чаша с огнём — вокруг себя
@@ -377,19 +378,31 @@ public static class MapRenderer
     // ---------- предметы ----------
 
     // Предметы — сундуки со свечением. Проклятый — сундук-мимик и фиолетовое свечение (бит i в curseMask).
-    private static void DrawItems(GameMap map, GameLayout layout, byte curseMask, double time)
+    // Начатое проклятие — фиолетовая полоска над сундуком; тот, что проклинают прямо сейчас, трясётся и мигает.
+    private static void DrawItems(GameMap map, GameLayout layout, Snapshot snapshot, IReadOnlyList<bool> cursing, double time)
     {
+        var cell = layout.Cell;
         for (var i = 0; i < map.Items.Count; i++)
         {
             var center = layout.ToScreen(map.Items[i]);
-            var cursed = (curseMask & (1 << i)) != 0;
-            var glow = cursed ? Theme.CurseGlow : Theme.ItemGlow;
-            var pulse = 1 + 0.12f * MathF.Sin((float)time * 4 + i); // свечение чуть «дышит»
-            Raylib.DrawCircleGradient((int)center.X, (int)center.Y, layout.Cell * 0.9f * pulse, glow, Raylib.Fade(glow, 0));
+            var cursed = snapshot.IsCursed(i);
+            var now = cursing[i];
+            var glow = cursed || now ? Theme.CurseGlow : Theme.ItemGlow;
+            var pulse = now
+                ? 1.3f + 0.3f * MathF.Sin((float)time * 14)          // проклинают — свечение быстро бьётся
+                : 1 + 0.12f * MathF.Sin((float)time * 4 + i);         // иначе чуть «дышит»
+            Raylib.DrawCircleGradient((int)center.X, (int)center.Y, cell * 0.9f * pulse, glow, Raylib.Fade(glow, 0));
 
-            var size = layout.Cell;
+            var shake = now ? MathF.Sin((float)time * 40) * cell * 0.04f : 0;
             Assets.DrawSprite(cursed ? Sprites.Mimic : Sprites.Chest,
-                new Rectangle(center.X - size / 2f, center.Y - size / 2f, size, size));
+                new Rectangle(center.X - cell / 2f + shake, center.Y - cell / 2f, cell, cell));
+
+            var progress = snapshot.CurseProgressOf(i);
+            if (!cursed && progress > 0)
+            {
+                var bar = new Rectangle(center.X - cell * 0.45f, center.Y - cell * 0.8f, cell * 0.9f, MathF.Max(5, cell * 0.14f));
+                Ui.ProgressBar(bar, progress / 100f, Theme.CurseGlow with { A = 255 });
+            }
         }
     }
 

@@ -21,8 +21,14 @@ public record SnapshotPlayer(int PlayerId, float X, float Y, float AimX, float A
 }
 
 // Снимок раунда: tick, оставшееся время, игроки (призрак — только если видим), маска проклятых предметов,
-// сколько призрак уже набрал до поимки — от 0 до 100 %
-public record Snapshot(uint Tick, ushort TimeLeft, List<SnapshotPlayer> Players, byte CurseMask, byte CatchProgress = 0)
+// сколько призрак уже набрал до поимки (0–100 %) и прогресс проклятия каждого из 5 предметов (0–100 %)
+public record Snapshot(uint Tick, ushort TimeLeft, List<SnapshotPlayer> Players, byte CurseMask, byte CatchProgress = 0,
+    byte[]? CurseProgress = null)
 {
+    public const int ItemCount = 5;
+
     public bool IsCursed(int itemIndex) => (CurseMask & (1 << itemIndex)) != 0;
+
+    // Прогресс проклятия предмета в %; если в снимке его нет — 0
+    public byte CurseProgressOf(int itemIndex) => CurseProgress is { } p && itemIndex < p.Length ? p[itemIndex] : (byte)0;
 }
