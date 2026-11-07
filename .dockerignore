@@ -1,0 +1,9 @@
+# Что не отправлять в Docker при сборке: результаты сборки, клиент с ассетами, служебные файлы IDE и git
+**/bin/
+**/obj/
+publish/
+GhostGame.Client/
+.git/
+.idea/
+*.user
+*.docx

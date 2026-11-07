@@ -1,0 +1,10 @@
+# Запуск сервера одной командой: docker compose up -d --build
+# Остановить: docker compose down. Логи: docker compose logs -f
+services:
+  server:
+    build: .
+    image: ghostgame-server
+    ports:
+      - "5000:5000/udp"   # обязательно /udp — без него Docker пробросит только TCP, и клиенты не достучатся
+    restart: unless-stopped # упал или VPS перезагрузился — поднимется сам
+    mem_limit: 256m         # если сервер начнёт есть память, VPS не ляжет

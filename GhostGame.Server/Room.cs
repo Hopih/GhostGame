@@ -355,6 +355,3 @@ public class Room
         return (Flashlight.Covers(map, playerVector, aimVector, ghost));
     }
 }
-
-
-
