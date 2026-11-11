@@ -7,9 +7,12 @@ using GhostGame.Client.Screens;
 using GhostGame.Shared;
 using Raylib_cs;
 
-var server = new IPEndPoint(
-    args.Length > 0 ? IPAddress.Parse(args[0]) : IPAddress.Loopback,
-    args.Length > 1 ? int.Parse(args[1]) : 5000);
+// Адрес сервера вводится на экране входа. По умолчанию — наш сервер на VPS (Docker);
+// аргументы запуска «ip [порт]» только подставляют в поле другой адрес (удобно в Rider: 127.0.0.1 5000).
+const string DefaultServer = "45.154.185.149:5000";
+const int DefaultPort = 5000;
+var serverText = args.Length > 0 ? args[0] + (args.Length > 1 ? $":{args[1]}" : "") : DefaultServer;
+var server = new IPEndPoint(IPAddress.Loopback, DefaultPort); // настоящий адрес берётся из поля при нажатии «Войти»
 var map = GameMap.Load();
 
 // --- сеть: сокет, канал и очередь входящих создаются заново на каждое подключение ---
@@ -53,7 +56,7 @@ MenuBackdrop.Init(map); // фон меню — тот же особняк
 Sfx.Load();             // звуки — тоже после InitWindow
 
 // Экраны меню: только рисуют и сообщают, что нажали. Что отправить серверу, решает этот файл.
-var connectScreen = new ConnectScreen();
+var connectScreen = new ConnectScreen(serverText);
 var lobbyScreen = new LobbyScreen();
 var roomScreen = new RoomScreen();
 var resultsScreen = new ResultsScreen();
@@ -113,10 +116,26 @@ void SendUnreliable(PacketType type, byte[] payload)
 }
 
 // Кнопка «Войти»: при первой попытке (и после обрыва) — новый сокет, канал и фоновые задачи; потом Hello
-void Connect(string nick)
+void Connect(string nick, string address)
 {
+    var endpoint = ParseServer(address);
+    if (endpoint == null)
+    {
+        ShowStatus("Ошибка: не понял адрес сервера, нужно ip:порт");
+        Sfx.Play(Sfx.Error, 0.6f);
+        return;
+    }
+    if (channel != null && !endpoint.Equals(server))
+    {
+        // после неудачной попытки (например, ник занят) поменяли адрес — старое подключение бросаем
+        channel = null;
+        transport = null;
+        socket?.Close();
+        socket = null;
+    }
     if (channel == null)
     {
+        server = endpoint;
         socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
         socket.Bind(new IPEndPoint(IPAddress.Any, 0)); // порт выбирает ОС — можно запустить несколько клиентов
         transport = new Transport(socket);
@@ -131,6 +150,39 @@ void Connect(string nick)
     Send(PacketType.Hello, Packets.WriteHello(1, nick));
     helloSentAt = Environment.TickCount64;
     ShowStatus("Подключение…");
+}
+
+// «ip», «ip:порт», «имя», «имя:порт» → адрес сервера; не разобрали — null. Порт не указан — 5000.
+static IPEndPoint? ParseServer(string text)
+{
+    var host = text.Trim();
+    var port = DefaultPort;
+    var colon = host.LastIndexOf(':');
+    if (colon >= 0)
+    {
+        if (!int.TryParse(host[(colon + 1)..], out port) || port is < 1 or > 65535)
+        {
+            return null;
+        }
+        host = host[..colon];
+    }
+    if (host.Length == 0)
+    {
+        return null;
+    }
+    if (!IPAddress.TryParse(host, out var ip))
+    {
+        try
+        {
+            // сокет у клиента IPv4 — берём IPv4-адрес имени
+            ip = Dns.GetHostAddresses(host).FirstOrDefault(a => a.AddressFamily == AddressFamily.InterNetwork);
+        }
+        catch (Exception e) when (e is SocketException or ArgumentException)
+        {
+            return null;
+        }
+    }
+    return ip == null ? null : new IPEndPoint(ip, port);
 }
 
 // Вернуться на экран подключения: сервер не отвечает, связь потеряна или сервер отключил
@@ -343,10 +395,9 @@ async Task ResendLoopAsync(ReliableChannel ch)
 
 void ConnectFrame()
 {
-    var nick = connectScreen.Draw(server.ToString(), waiting: helloSentAt >= 0);
-    if (nick != null)
+    if (connectScreen.Draw(waiting: helloSentAt >= 0))
     {
-        Connect(nick);
+        Connect(connectScreen.Nick, connectScreen.Server);
     }
 }
 
