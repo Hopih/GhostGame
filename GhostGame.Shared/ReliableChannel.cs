@@ -2,7 +2,7 @@ using System.Net;
 
 namespace GhostGame.Shared;
 
-// Надёжный канал поверх UDP (ТЗ 3.6): нумерация, подтверждения, повторы, отсев дубликатов, порядок.
+// Надёжный канал поверх UDP: нумерация, подтверждения, повторы, отсев дубликатов, порядок.
 // Один экземпляр на собеседника. Состояние общее для цикла приёма и таймера повторов, поэтому всё под lock.
 public sealed class ReliableChannel
 {
@@ -16,8 +16,8 @@ public sealed class ReliableChannel
 
     private uint nextSendSeq = 1;
     private uint nextExpected = 1;
-    private readonly Dictionary<uint, Pending> unacked = new();    //неподтвержденные пакеты
-    private readonly Dictionary<uint, Packet> outOfOrder = new();  //пакеты пришедшие раньше времени
+    private readonly Dictionary<uint, Pending> unacked = new(); // неподтверждённые пакеты
+    private readonly Dictionary<uint, Packet> outOfOrder = new(); // пакеты, пришедшие раньше своей очереди
     private int totalResent;
 
     public ReliableChannel(Transport transport, EndPoint peer)
@@ -42,7 +42,7 @@ public sealed class ReliableChannel
         or PacketType.Welcome or PacketType.RoomList or PacketType.RoomState or PacketType.ChatMessage
         or PacketType.GameStart or PacketType.GameEvent or PacketType.GameOver or PacketType.Error;
 
-    // Отправка: следующий seq, в сеть и в таблицу неподтверждённых
+    // Сначала в таблицу неподтверждённых, потом в сеть: иначе Ack мог бы прийти раньше записи
     public Task SendAsync(PacketType type, byte[] payload)
     {
         if (!IsReliable(type))
@@ -99,7 +99,7 @@ public sealed class ReliableChannel
                 nextExpected++;
                 while (true)
                 {
-                    if (!outOfOrder.ContainsKey(nextExpected)) // следующего номера в буфере нет?
+                    if (!outOfOrder.ContainsKey(nextExpected))
                     {
                         break;                                 
                     }
@@ -167,7 +167,7 @@ public sealed class ReliableChannel
         {
             Datagram = datagram;
             FirstSentAt = sentAt;
-            LastSentAt = sentAt; //???
+            LastSentAt = sentAt;
         }
 
         public byte[] Datagram { get; }

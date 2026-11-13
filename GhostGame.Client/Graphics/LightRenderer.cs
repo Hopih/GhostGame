@@ -3,7 +3,7 @@ using Raylib_cs;
 
 namespace GhostGame.Client.Graphics;
 
-// Темнота и свет — только картинка для атмосферы. Кого на самом деле видно, решает сервер (туман войны, этап 6).
+// Темнота и свет — только картинка для атмосферы. Кого на самом деле видно, решает сервер (туман войны).
 // Как устроено: отдельная «плёнка» (RenderTexture) размером с окно в мир заливается почти чёрным,
 // в ней «стираются» светлые места — вокруг себя, вокруг охотников, лучи фонарей, предметы —
 // и плёнка кладётся поверх уже нарисованных карты и игроков.
@@ -28,7 +28,7 @@ public sealed class LightRenderer
         Vector2 OnFilm(Vector2 cells) => layout.ToScreen(cells) - corner; // клетки карты → пиксели внутри плёнки
 
         Raylib.BeginTextureMode(film);
-        Raylib.ClearBackground(new Color(8, 5, 12, ghostView ? 80 : 190)); // призрак видит всю карту (ТЗ 5.1) — ему темнота слабая
+        Raylib.ClearBackground(new Color(8, 5, 12, ghostView ? 80 : 190)); // призрак видит всю карту — ему темнота слабая
         Rlgl.SetBlendFactors(GlZero, GlOneMinusSrcAlpha, GlFuncAdd);
         Raylib.BeginBlendMode(BlendMode.Custom);
 

@@ -7,9 +7,9 @@ namespace GhostGame.Client.Screens;
 // Что игрок сделал в лобби в этом кадре. Program.cs превращает это в пакеты.
 public abstract record LobbyAction
 {
-    public sealed record Join(int RoomId) : LobbyAction;     // клик по комнате
-    public sealed record Create(string Name) : LobbyAction;  // «Создать»
-    public sealed record Refresh() : LobbyAction;            // «Обновить»
+    public sealed record Join(int RoomId) : LobbyAction;
+    public sealed record Create(string Name) : LobbyAction;
+    public sealed record Refresh() : LobbyAction;
 }
 
 // Экран лобби: список комнат и создание своей. Только рисует и сообщает, что нажали.

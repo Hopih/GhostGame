@@ -7,8 +7,8 @@ namespace GhostGame.Client.Screens;
 // Что игрок сделал в комнате в этом кадре. Program.cs превращает это в пакеты.
 public abstract record RoomAction
 {
-    public sealed record ToggleReady() : RoomAction;  // «Готов» / «Не готов»
-    public sealed record Leave() : RoomAction;        // «Выйти»
+    public sealed record ToggleReady() : RoomAction;
+    public sealed record Leave() : RoomAction;
     public sealed record Chat(string Text) : RoomAction;
 }
 
@@ -22,7 +22,7 @@ public sealed class RoomScreen
 
     public void Focus() => chatInput.Focused = true;
 
-    // players и hostId — из последнего RoomState: готовность показываем такой, какой её считает сервер (ТЗ 3.4)
+    // players и hostId — из последнего RoomState: готовность показываем такой, какой её считает сервер
     public RoomAction? Draw(string roomName, int hostId, IReadOnlyList<RoomPlayer> players, int myId, IReadOnlyList<string> chat)
     {
         RoomAction? action = null;

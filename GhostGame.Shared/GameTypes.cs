@@ -1,6 +1,6 @@
 namespace GhostGame.Shared;
 
-// Данные раунда, общие для сервера и клиента. Пакеты Input и Snapshot (ТЗ 3.4, 3.5) пишутся и читаются через эти типы.
+// Данные раунда, общие для сервера и клиента: через них пишутся и читаются Input и Snapshot.
 
 // Что игрок нажал: Input без inputSeq — номер добавляется при отправке
 public record InputState(sbyte MoveX, sbyte MoveY, float AimX, float AimY, byte Actions)
@@ -12,10 +12,9 @@ public record InputState(sbyte MoveX, sbyte MoveY, float AimX, float AimY, byte 
     public bool Primary => (Actions & ActionPrimary) != 0;
 }
 
-// Элемент списка игроков в Snapshot
 public record SnapshotPlayer(int PlayerId, float X, float Y, float AimX, float AimY, byte Flags , byte Charge)
 {
-    public const byte FlagFlashlight = 1; // бит 0 flags: фонарь включён
+    public const byte FlagFlashlight = 1;
 
     public const byte FlashlightOverheated = 2;
     

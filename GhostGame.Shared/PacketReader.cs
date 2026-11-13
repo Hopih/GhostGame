@@ -15,7 +15,6 @@ public class PacketReader
 
     public PacketReader(byte[] data)
     {
-        // запомнить data
         this.data = data;
         position = 0;
     }

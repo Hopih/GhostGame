@@ -20,28 +20,26 @@ public class PlayerState
 
     public float Battery = 0;
 
-    // где стоит, в клетках; меняется каждый тик
+    // позиция в клетках, меняется каждый тик
     public float X { get; set; }
     public float Y { get; set; }
 
     // последний принятый Input: что игрок держит нажатым сейчас; пока ничего не прислал — стоит
     public InputState Input { get; set; } = InputState.Idle;
 
-    // номер последнего принятого Input: всё, что придёт с номером не больше, — опоздавшее, выбрасываем (ТЗ 4.3)
     public uint LastInputSeq { get; set; }
 
-    // когда пришёл последний Input: дольше 500 мс без Input — игрок стоит на месте (ТЗ 4.3)
+    // когда пришёл последний Input: дольше 500 мс без Input — игрок стоит
     public long LastInputAt { get; set; }
 
-    // зажата ли ЛКМ в этом тике (с учётом таймаута 500 мс): у охотника это фонарь, у призрака — проклятие; ставит игровой цикл
+    // зажата ли ЛКМ в этом тике: у охотника это фонарь, у призрака — проклятие
     public bool PrimaryHeld { get; set; }
 
-    // горит ли фонарь в этом тике: охотник держит ЛКМ; ставит игровой цикл
     public bool FlashlightOn { get; set; }
     
     public bool Muted { get; set; }
 
-    // клеток в секунду (ТЗ 4.3)
+    // клеток в секунду
     public float Speed => Role == Role.Ghost ? 4.5f : 4f;
     
 }

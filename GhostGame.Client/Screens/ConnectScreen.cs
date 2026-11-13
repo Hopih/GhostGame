@@ -29,7 +29,6 @@ public sealed class ConnectScreen
         var top = MathF.Max(40, Raylib.GetScreenHeight() * 0.14f);
         var t = (float)Raylib.GetTime();
 
-        // Tab — перейти из поля ника в поле сервера и обратно
         if (Raylib.IsKeyPressed(KeyboardKey.Tab))
         {
             var toServer = nickInput.Focused;
@@ -42,7 +41,6 @@ public sealed class ConnectScreen
         Ui.Title("Призрак и охотники", centerX, top, 80);
         Ui.TextCentered("сетевая игра на 3–5 игроков  ·  один из вас — призрак", centerX, top + 112, 22, Theme.Text);
 
-        // карточка входа
         var card = new Rectangle(centerX - 260, top + 176, 520, 380);
         Ui.Panel(card);
         Ui.Text("Ваш ник", card.X + 40, card.Y + 30, 18, Theme.Muted);

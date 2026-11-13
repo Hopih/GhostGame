@@ -2,7 +2,7 @@ namespace GhostGame.Shared;
 
 public enum PacketType : byte
 {
-    // Клиент → сервер (ТЗ 3.4)
+    // Клиент → сервер
     Hello = 0x01,
     Ping = 0x02,
     ClientDisconnect = 0x03,
@@ -17,7 +17,7 @@ public enum PacketType : byte
     // В обе стороны
     Ack = 0x7F,
 
-    // Сервер → клиент (ТЗ 3.5)
+    // Сервер → клиент
     Welcome = 0x81,
     Pong = 0x82,
     ServerDisconnect = 0x83,

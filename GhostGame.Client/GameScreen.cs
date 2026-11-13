@@ -6,14 +6,9 @@ using Raylib_cs;
 
 namespace GhostGame.Client;
 
-// Экран игры (ТЗ 5.1). Здесь только состояние раунда: последние Snapshot от сервера, кто есть кто, что нажато.
+// Экран игры. Здесь только состояние раунда: последние Snapshot от сервера, кто есть кто, что нажато.
 // Рисуют классы из Graphics/ — отсюда им передаются готовые данные.
 // Сам ничего не решает: показывает то, что прислал сервер, и читает нажатия, которые потом уходят в Input.
-//
-// Как пользоваться (создать на GameStart, дальше каждый кадр):
-//   game.ApplySnapshot(snapshot)  — когда пришёл Snapshot
-//   var input = game.ReadInput()  — что нажато сейчас; отправлять Input 20 раз в секунду
-//   game.Draw(pingMs)             — между BeginDrawing и EndDrawing; true — после конца раунда нажали «В комнату»
 public sealed class GameScreen
 {
     private const float SnapshotInterval = 50; // сервер шлёт Snapshot раз в 50 мс
@@ -27,8 +22,8 @@ public sealed class GameScreen
     private readonly LightRenderer light = new();
     private readonly GameAudio audio;
     private readonly List<Vector2> lamps;  // факелы и светящиеся чаши — постоянные пятна света
-    private Snapshot previous;  // предпоследний применённый Snapshot
-    private Snapshot current;   // последний применённый Snapshot
+    private Snapshot previous;
+    private Snapshot current;
     private long currentAt;     // когда применили последний
     private Vector2 focus;      // куда смотрит камера: свой игрок в прошлом кадре
 
@@ -41,7 +36,7 @@ public sealed class GameScreen
         this.myRole = myRole;
         this.nicks = nicks;
 
-        // Роли других игроков в GameStart не приходят. Но призрак всегда появляется в точке G (ТЗ 6.1),
+        // Роли других игроков в GameStart не приходят. Но призрак всегда появляется в точке G,
         // поэтому призрак — тот, чья точка появления совпадает с G.
         ghostId = myRole == Role.Ghost
             ? myId
@@ -65,8 +60,8 @@ public sealed class GameScreen
 
     public Role MyRole => myRole;
 
-    // ТЗ 5.3: Snapshot применяется, только если его tick больше последнего применённого.
-    // Опоздавший или повторный Snapshot просто отбрасывается. Возвращает true, если снимок применён.
+    // Snapshot применяется, только если его tick больше последнего применённого:
+    // опоздавший или повторный просто отбрасывается. Возвращает true, если снимок применён.
     public bool ApplySnapshot(Snapshot next)
     {
         if (next.Tick <= current.Tick)
@@ -89,7 +84,7 @@ public sealed class GameScreen
         if (Raylib.IsKeyDown(KeyboardKey.W)) moveY--;
         if (Raylib.IsKeyDown(KeyboardKey.S)) moveY++;
 
-        var aim = GameLayout.ForWindow(focus).ToCells(Raylib.GetMousePosition()); // где на карте мышь — туда смотрит фонарь
+        var aim = GameLayout.ForWindow(focus).ToCells(Raylib.GetMousePosition());
         var actions = Raylib.IsMouseButtonDown(MouseButton.Left) ? InputState.ActionPrimary : (byte)0;
         return new InputState(moveX, moveY, aim.X, aim.Y, actions);
     }
@@ -102,7 +97,7 @@ public sealed class GameScreen
         var me = players.FirstOrDefault(p => p.IsMe);
         if (me.IsMe)
         {
-            focus = me.Position; // камера смотрит на себя
+            focus = me.Position;
         }
         var layout = GameLayout.ForWindow(focus);
         var time = Raylib.GetTime();

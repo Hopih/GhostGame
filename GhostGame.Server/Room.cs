@@ -32,7 +32,6 @@ public class Room
     public int HostId { get; private set; }
     public bool InGame { get; private set; }
 
-    // игроки комнаты: ключ — playerId
     public Dictionary<int, ClientSession> Players { get; } = new();
 
     // состояния игроков в текущем раунде: ключ — playerId; пусто, пока раунд не идёт
@@ -64,7 +63,7 @@ public class Room
         player.IsReady = false;
         if (player.PlayerId == HostId && !IsEmpty)
         {
-            HostId = Players.Keys.First(); // хост ушёл — хостом становится следующий
+            HostId = Players.Keys.First();
         }
     }
 
@@ -83,14 +82,14 @@ public class Room
         }
     }
 
-    // RoomState всем: шлётся при любом изменении комнаты (ТЗ 3.5)
+    // RoomState всем — шлётся при любом изменении комнаты
     public Task BroadcastStateAsync()
     {
         var list = Players.Values.Select(p => new RoomPlayer(p.PlayerId, p.Nick!, p.IsReady)).ToList();
         return BroadcastAsync(PacketType.RoomState, Packets.WriteRoomState(Id, Name, HostId, list));
     }
 
-    // Старт раунда: случайный призрак, каждому свой GameStart со своей ролью (ТЗ 4.2)
+    // Старт раунда: случайный призрак, каждому свой GameStart со своей ролью
     public async Task<ClientSession> StartGameAsync(GameMap map , Transport transport)
     {
         InGame = true;
@@ -108,7 +107,7 @@ public class Room
         {
             Round.Clear();
             InLight = 0;
-            curseMask = 0;                  // новый раунд — все сундуки снова целые
+            curseMask = 0;
             Array.Clear(curseSeconds);
             foreach (var s in spawns)
             {
@@ -130,21 +129,20 @@ public class Room
         return ghost;
     }
 
-    // Запомнить Input игрока (ТЗ 4.3). Пакет уже разобран в Program.cs — сюда приходят готовые значения.
-    // Берём только Input с номером больше последнего принятого: опоздавший или повторный выбрасываем.
-    // «Перескок» через номер — нормально: пропавший Input не нужен, новый и так говорит, что нажато сейчас.
+    // Запомнить Input игрока. Номер не больше последнего принятого — опоздавший или повтор, выбрасываем.
+    // Пропуск номеров не страшен: новый Input и так говорит, что нажато сейчас.
     public void ApplyInput(int playerId, uint inputSeq, InputState input)
     {
         lock (roundLock)
         {
             if (!InGame || !Round.TryGetValue(playerId, out var player))
             {
-                return; // раунд не идёт или игрока в раунде нет
+                return;
             }
 
             if (inputSeq <= player.LastInputSeq)
             {
-                return; // опоздавший или повтор
+                return;
             }
 
             player.LastInputSeq = inputSeq;
@@ -153,15 +151,14 @@ public class Room
         }
     }
 
-    // Игровой цикл комнаты (ТЗ 4.3): раз в 50 мс сдвинуть всех по их Input и разослать Snapshot.
-    // Работает в фоне (Task.Run из StartGameAsync), пока идёт раунд.
+    // Игровой цикл комнаты: раз в 50 мс сдвинуть всех по их Input и разослать Snapshot. Работает в фоне, пока идёт раунд.
     public async Task GameLoopAsync(GameMap map, Transport transport)
     {
         const float TickSeconds = 0.05f;   // длина тика: 20 тиков в секунду
         const float PlayerRadius = 0.35f;  // «толщина» игрока для стен — такая же, как рисует клиент
         
         uint tick = 0;
-        var endAt = Environment.TickCount64 + RoundSeconds * 1000L; // когда раунд закончится
+        var endAt = Environment.TickCount64 + RoundSeconds * 1000L;
         
         while (InGame)
         {
@@ -171,20 +168,20 @@ public class Room
             var msLeft = Math.Max(0, endAt - now);
             var timeLeft = (ushort)((msLeft + 999) / 1000); // сколько секунд осталось, с округлением вверх
 
-            var snapshots = new List<SnapshotPlayer>(); // новый список на каждый тик
+            var snapshots = new List<SnapshotPlayer>();
             List<PlayerState> recipients;
             List<SnapshotPlayer> huntersView;
             GameOverReason? over = null;              // не null — раунд кончился, и вот почему
-            List<PlayerRole>? gameOverPlayers = null; // кто кем был — для GameOver
-            byte catchProgress = 0; // сколько набрано до поимки, % — уходит в Snapshot
+            List<PlayerRole>? gameOverPlayers = null;
+            byte catchProgress = 0;
             byte chargeProgress = 0;
-            byte[] curseProgress;                     // прогресс проклятия каждого сундука, % — уходит в Snapshot
+            byte[] curseProgress;
             lock (roundLock)
             {
                 // этап 1: сдвинуть всех и собрать список для снимка
                 foreach (var player in Round.Values)
                 {
-                    // 500 мс без Input — считаем, что ничего не нажато (ТЗ 4.3). Само нажатие не стираем.
+                    // 500 мс без Input — считаем, что ничего не нажато. Само нажатие не стираем.
                     var input = now - player.LastInputAt > 500 ? InputState.Idle : player.Input;
 
                     var step = player.Speed * TickSeconds; // скорость в клетках/с × длина тика
@@ -247,7 +244,7 @@ public class Room
                 var ghostVisible = ghost != null && Round.Values.Any(p => p.FlashlightOn
                     && GhostVisionCheck(map, p.X, p.Y, p.Input.AimX, p.Input.AimY, ghost.X, ghost.Y));
 
-                // охотникам — без призрака, пока он не в луче (ТЗ 4.4); призрака нет совсем — всем одно и то же
+                // охотникам — без призрака, пока он не в луче; призрака нет совсем — всем одно и то же
                 huntersView = ghost == null || ghostVisible
                     ? snapshots
                     : snapshots.Where(x => x.PlayerId != ghost.Session.PlayerId).ToList();
@@ -299,7 +296,7 @@ public class Room
                 recipients = Round.Values.ToList(); // кому слать — копия, чтобы не трогать Round вне замка
             }
 
-            // этап 2: призраку — все игроки, охотникам — huntersView; этап 3: каждому свой снимок
+            // этап 2, уже вне замка: призраку — снимок со всеми, охотникам — huntersView
             var ghostSnapshot = Packets.WriteSnapshot(new Snapshot(tick, timeLeft, snapshots, curseMask, catchProgress, curseProgress));
             var huntersSnapshot = Packets.WriteSnapshot(new Snapshot(tick, timeLeft, huntersView, curseMask, catchProgress, curseProgress));
             foreach (var player in recipients)
@@ -309,7 +306,7 @@ public class Room
             }
 
             // раунд кончился (пойман, проклято 3 сундука или вышло время) — GameOver всем участникам раунда:
-            // надёжно, с await и уже вне замка; потом RoomState со сброшенной готовностью (ТЗ 3.7)
+            // надёжно, с await и уже вне замка; потом RoomState со сброшенной готовностью
             if (over != null && gameOverPlayers != null)
             {
                 InGame = false;
@@ -335,7 +332,7 @@ public class Room
         {
             if ((curseMask & (1 << i)) != 0)
             {
-                continue; // уже проклят
+                continue;
             }
             var distance = Vector2.Distance(new Vector2(ghost.X, ghost.Y), map.Items[i]);
             if (distance <= bestDistance)

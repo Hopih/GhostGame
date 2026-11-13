@@ -1,6 +1,5 @@
 namespace GhostGame.Shared;
 
-// GameOver.reason (ТЗ 3.5)
 public enum GameOverReason : byte
 {
     GhostCaught = 1,   // призрак пойман — победа охотников

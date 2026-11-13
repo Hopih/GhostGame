@@ -21,7 +21,6 @@ public static class HudRenderer
         var y = panel.Y + 16;
         var width = panel.Width - 32;
 
-        // роль
         if (myRole == Role.Ghost)
         {
             Assets.DrawSprite(Sprites.Ghost, new Rectangle(x, y, 40, 40), Theme.GhostTint);
@@ -58,7 +57,7 @@ public static class HudRenderer
         }
 
         // проклятые предметы: сундук — цел, мимик — проклят, под сундуком — сколько уже набрано;
-        // тот, что проклинают прямо сейчас, мигает. Призраку для победы нужно 3 (ТЗ 6).
+        // тот, что проклинают прямо сейчас, мигает. Призраку для победы нужно 3.
         var anyCursing = cursing.Any(c => c);
         Ui.Text(anyCursing ? $"ПРОКЛИНАЮТ!  {BitOperations.PopCount(curseMask)} / 3" : $"ПРОКЛЯТО  {BitOperations.PopCount(curseMask)} / 3",
             x, y, 16, anyCursing ? Theme.CurseGlow with { A = 255 } : Theme.Muted);
@@ -78,10 +77,8 @@ public static class HudRenderer
         }
         y += 22 + icon + 26;
 
-        // мини-карта всего особняка
         y += DrawMinimap(layout, map, players, curseMask, cursing, x, y, width) + 16;
 
-        // игроки раунда
         Ui.Text("ИГРОКИ", x, y, 16, Theme.Muted);
         y += 22;
         foreach (var entry in roster)
@@ -101,7 +98,6 @@ public static class HudRenderer
         }
         y += 14;
 
-        // пинг и подсказка
         Ui.Text($"пинг {(pingMs < 0 ? "—" : $"{pingMs} мс")}", x, y, 18, Theme.Muted);
         Ui.Text(Sfx.Muted ? "звук выключен" : "звук включён", x + width / 2, y, 18, Sfx.Muted ? Theme.Error : Theme.Muted);
         y += 30;

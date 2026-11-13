@@ -6,7 +6,7 @@ namespace GhostGame.Client.Graphics;
 // Игроки: тень, фигурка, своё кольцо, ники и лучи фонарей
 public static class PlayerRenderer
 {
-    public const float FlashlightLength = 5f;  // ТЗ 6.3: конус длиной 5 клеток
+    public const float FlashlightLength = 5f; // конус длиной 5 клеток
     public const float FlashlightAngle = 60f;  // и шириной 60°
 
     // Фигурки рисуются до темноты — в тёмном углу игрок тоже темнеет.
@@ -42,7 +42,7 @@ public static class PlayerRenderer
     }
 
     // Лучи поверх темноты: у охотника — тёплый свет, у призрака — красная опасная зона.
-    // Это только картинка: кого поймал луч, решает сервер (этап 6).
+    // Это только картинка: кого поймал луч, решает сервер.
     public static void DrawBeams(IReadOnlyList<PlayerView> players, GameLayout layout, bool ghostView)
     {
         // за край окна луч не вылезет: GameScreen рисует всё это внутри scissor по окну в мир

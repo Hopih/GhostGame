@@ -1,6 +1,5 @@
 namespace GhostGame.Shared;
 
-// Error.code (ТЗ 3.5)
 public enum ErrorCode : byte
 {
     BadNick = 1,

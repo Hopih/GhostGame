@@ -3,7 +3,7 @@ using System.Numerics;
 
 namespace GhostGame.Shared;
 
-// Карта особняка 64×40 клеток из текстового файла, одинакового у сервера и клиента (ТЗ 4.3).
+// Карта особняка 64×40 клеток из текстового файла, одинакового у сервера и клиента.
 // Координаты в клетках: клетка (x, y) занимает квадрат от (x, y) до (x + 1, y + 1), её центр — (x + 0.5, y + 0.5).
 //
 // Символы:
@@ -45,7 +45,6 @@ public sealed class GameMap
     // Items[0] — предмет «1», …, Items[4] — предмет «5»; номер в списке совпадает с битом в curseMask
     public IReadOnlyList<Vector2> Items { get; }
 
-    // Названия комнат — только для картинки, на правила не влияют
     public IReadOnlyList<MapLabel> Labels { get; }
 
     public char this[int x, int y] => cells[x, y];
@@ -127,7 +126,6 @@ public sealed class GameMap
             ParseLabels(lines.Skip(Height)));
     }
 
-    // Подписи комнат: «@x y Название». Пустые строки пропускаем.
     private static List<MapLabel> ParseLabels(IEnumerable<string> lines)
     {
         var labels = new List<MapLabel>();
@@ -185,5 +183,4 @@ public sealed class GameMap
     }
 }
 
-// Подпись комнаты на карте: где (центр, в клетках) и что написать
 public record MapLabel(Vector2 Position, string Text);

@@ -19,7 +19,7 @@ var map = GameMap.Load();
 Socket? socket = null;
 Transport? transport = null;
 ReliableChannel? channel = null;
-var incoming = System.Threading.Channels.Channel.CreateUnbounded<Packet>(); // приём кладёт сюда, главный поток разбирает (ТЗ 5.3)
+var incoming = System.Threading.Channels.Channel.CreateUnbounded<Packet>(); // приём кладёт сюда, главный поток разбирает
 var lastHeard = 0L;        // когда последний раз что-то пришло от сервера (пишет фоновый приём)
 var pingMs = -1L;
 var channelFailed = false; // надёжный пакет не подтверждён 10 с (ставит фоновая задача повторов)
@@ -29,22 +29,21 @@ var screen = Screen.Connect;
 var connected = false;      // Welcome получен
 var helloSentAt = -1L;      // когда отправили Hello; -1 — Welcome не ждём
 var myId = 0;
-var status = "";            // сообщение внизу экрана: ошибка, «подключено» и т. п.
+var status = "";
 var statusUntil = 0L;
 var rooms = new List<RoomInfo>();
 var lastRoomsRequest = 0L;
-(int RoomId, string Name, int HostId, List<RoomPlayer> Players)? room = null; // последний RoomState
+(int RoomId, string Name, int HostId, List<RoomPlayer> Players)? room = null;
 var chat = new List<string>();
 GameScreen? game = null;
 var roundNicks = new Dictionary<int, string>(); // ники участников раунда на момент GameStart — для экрана итогов
-(Role Winner, GameOverReason Reason, List<PlayerRole> Players)? result = null; // последний GameOver
+(Role Winner, GameOverReason Reason, List<PlayerRole> Players)? result = null;
 uint inputSeq = 0;
 var lastInputAt = 0L;
 var lastPingAt = 0L;
 
 Raylib.SetTraceLogLevel(TraceLogLevel.Warning);
-// Окно открывается развёрнутым на весь экран (окно 1920×1080 на экране 1920×1080 не влезает из-за заголовка и панели задач).
-// Его можно свернуть в окно и растягивать — экраны раскладываются от размера окна. MSAA сглаживает края кругов.
+// Окно развёрнуто на весь экран, но его можно уменьшить и растягивать — экраны раскладываются от размера окна.
 Raylib.SetConfigFlags(ConfigFlags.ResizableWindow | ConfigFlags.Msaa4xHint);
 Raylib.InitWindow(1600, 900, "Призрак и охотники");
 Raylib.MaximizeWindow();
@@ -52,7 +51,7 @@ Raylib.SetWindowMinSize(1240, 780);
 Raylib.SetTargetFPS(60);
 Raylib.SetExitKey(KeyboardKey.Null); // Esc не закрывает окно
 Assets.Load(); // спрайты и шрифт — только после InitWindow
-MenuBackdrop.Init(map); // фон меню — тот же особняк
+MenuBackdrop.Init(map);
 Sfx.Load();             // звуки — тоже после InitWindow
 
 // Экраны меню: только рисуют и сообщают, что нажали. Что отправить серверу, решает этот файл.
@@ -61,7 +60,7 @@ var lobbyScreen = new LobbyScreen();
 var roomScreen = new RoomScreen();
 var resultsScreen = new ResultsScreen();
 
-// Главный цикл кадров. Всё, что связано с окном, — только здесь, в главном потоке (ТЗ 5.3).
+// Главный цикл кадров. Всё, что связано с окном, — только здесь, в главном потоке.
 // Поэтому здесь нет await: после await код мог бы продолжиться в другом потоке, а Raylib работает только в этом.
 while (!Raylib.WindowShouldClose())
 {
@@ -84,7 +83,7 @@ while (!Raylib.WindowShouldClose())
     Raylib.EndDrawing();
 }
 
-// окно закрыли: 3 копии Disconnect — хотя бы одна должна дойти (ТЗ 3.7)
+// окно закрыли: 3 копии Disconnect — хотя бы одна должна дойти
 if (connected && transport != null)
 {
     for (var i = 0; i < 3; i++)
@@ -203,7 +202,7 @@ void Disconnect(string reason)
     ShowStatus(reason);
 }
 
-// Раз в кадр: Welcome за 5 с, Ping раз в секунду, 5 с тишины от сервера — «Соединение потеряно» (ТЗ 5.3)
+// Раз в кадр: Welcome за 5 с, Ping раз в секунду, 5 с тишины от сервера — «Соединение потеряно»
 void CheckConnection(long now)
 {
     if (helloSentAt >= 0 && now - helloSentAt > 5000)
@@ -304,7 +303,7 @@ void HandlePacket(Packet packet)
             break;
 
         case PacketType.GameOver:
-            // конец раунда (ТЗ 3.7): показываем итоги; Snapshot, если ещё придут, вне экрана игры игнорируются
+            // конец раунда: показываем итоги; Snapshot, если ещё придут, вне экрана игры игнорируются
             result = Packets.ReadGameOver(packet.Payload);
             game = null;
             screen = Screen.Results;
@@ -313,7 +312,7 @@ void HandlePacket(Packet packet)
             break;
 
         case PacketType.Snapshot:
-            // Snapshot без гарантий и может обогнать GameStart — вне экрана игры его просто игнорируем (ТЗ 3.6)
+            // Snapshot без гарантий и может обогнать GameStart — вне экрана игры его просто игнорируем
             if (screen == Screen.Game && game != null)
             {
                 game.ApplySnapshot(Packets.ReadSnapshot(packet.Payload));
@@ -432,7 +431,7 @@ void RoomFrame()
     switch (roomScreen.Draw(r.Name, r.HostId, r.Players, myId, chat))
     {
         case RoomAction.ToggleReady:
-            Send(PacketType.SetReady, Array.Empty<byte>()); // сервер переключит и пришлёт RoomState (ТЗ 3.4)
+            Send(PacketType.SetReady, Array.Empty<byte>()); // сервер переключит и пришлёт RoomState
             break;
         case RoomAction.Leave:
             // выходящему сервер RoomState не присылает — он уже не в комнате, поэтому уходим в лобби сами
@@ -456,7 +455,7 @@ void GameFrame(long now)
         return;
     }
 
-    // Input 20 раз в секунду независимо от частоты кадров, inputSeq растёт (ТЗ 5.3); без гарантий
+    // Input 20 раз в секунду независимо от частоты кадров, inputSeq растёт; без гарантий
     if (now - lastInputAt >= 50)
     {
         lastInputAt = now;
@@ -482,7 +481,7 @@ void ResultsFrame()
         return;
     }
 
-    if (resultsScreen.Draw(r.Winner, r.Reason, r.Players, roundNicks, myId)) // «В комнату»
+    if (resultsScreen.Draw(r.Winner, r.Reason, r.Players, roundNicks, myId))
     {
         result = null;
         screen = room != null ? Screen.Room : Screen.Lobby;

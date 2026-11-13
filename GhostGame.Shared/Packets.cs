@@ -2,7 +2,6 @@
 
 public static class Packets
 {
-    // Hello: version: byte, nick: string (ТЗ 3.4)
     public static byte[] WriteHello(byte version, string nick)
     {
         var w = new PacketWriter();
@@ -20,7 +19,6 @@ public static class Packets
         return (version, nick);
     }
 
-    // Chat: text: string (ТЗ 3.4)
     public static byte[] WriteChat(string text)
     {
         var w = new PacketWriter();
@@ -36,7 +34,7 @@ public static class Packets
         return text;
     }
 
-    // Ping: sentAt: long, мс (ТЗ 3.4)
+    // Ping: sentAt: long — время отправки у клиента, мс
     public static byte[] WritePing(long sentAt)
     {
         var w = new PacketWriter();
@@ -52,7 +50,7 @@ public static class Packets
         return sentAt;
     }
 
-    // Pong: sentAt: long, копия из Ping как есть (ТЗ 3.5)
+    // Pong: sentAt — копия из Ping как есть
     public static byte[] WritePong(long sentAt)
     {
         return WritePing(sentAt);
@@ -63,7 +61,6 @@ public static class Packets
         return ReadPing(payload);
     }
 
-    // Ack: ackSeq: uint (ТЗ 3.4, 3.5 — в обе стороны)
     public static byte[] WriteAck(uint ackSeq)
     {
         var w = new PacketWriter();
@@ -81,7 +78,6 @@ public static class Packets
 
     // ListRooms и LeaveRoom полей не имеют: данные пакета — Array.Empty<byte>()
 
-    // CreateRoom: name: string (ТЗ 3.4)
     public static byte[] WriteCreateRoom(string name)
     {
         var w = new PacketWriter();
@@ -97,7 +93,6 @@ public static class Packets
         return name;
     }
 
-    // JoinRoom: roomId: int (ТЗ 3.4)
     public static byte[] WriteJoinRoom(int roomId)
     {
         var w = new PacketWriter();
@@ -113,14 +108,14 @@ public static class Packets
         return roomId;
     }
 
-    // SetReady полей не имеет: сервер сам переключает готовность (ТЗ 3.4)
+    // SetReady полей не имеет: сервер сам переключает готовность
 
-    // RoomList: список из (roomId: int, name: string, players: byte, maxPlayers: byte, inGame: bool) (ТЗ 3.5)
+    // RoomList: список из (roomId: int, name: string, players: byte, maxPlayers: byte, inGame: bool)
     public static byte[] WriteRoomList(List<RoomInfo> rooms)
     {
         var w = new PacketWriter();
-        w.WriteByte((byte)rooms.Count); // список: сначала количество
-        foreach (var room in rooms) // потом элементы подряд
+        w.WriteByte((byte)rooms.Count);
+        foreach (var room in rooms)
         {
             w.WriteInt(room.RoomId);
             w.WriteString(room.Name);
@@ -151,7 +146,7 @@ public static class Packets
         return rooms;
     }
 
-    // RoomState: roomId: int, name: string, hostId: int, список из (playerId: int, nick: string, ready: bool) (ТЗ 3.5)
+    // RoomState: roomId: int, name: string, hostId: int, список из (playerId: int, nick: string, ready: bool)
     public static byte[] WriteRoomState(int roomId, string name, int hostId, List<RoomPlayer> players)
     {
         var w = new PacketWriter();
@@ -189,7 +184,7 @@ public static class Packets
         return (roomId, name, hostId, players);
     }
 
-    // GameStart: role: byte, roundSeconds: ushort, список из (playerId: int, x: float, y: float) (ТЗ 3.5)
+    // GameStart: role: byte, roundSeconds: ushort, список из (playerId: int, x: float, y: float)
     public static byte[] WriteGameStart(Role role, ushort roundSeconds, List<PlayerSpawn> spawns)
     {
         var w = new PacketWriter();
@@ -225,7 +220,7 @@ public static class Packets
         return (role, roundSeconds, spawns);
     }
 
-    // GameOver: winner: byte (0 — охотники, 1 — призрак), reason: byte, список из (playerId: int, role: byte) (ТЗ 3.5)
+    // GameOver: winner: byte (0 — охотники, 1 — призрак), reason: byte, список из (playerId: int, role: byte)
     public static byte[] WriteGameOver(Role winner, GameOverReason reason, List<PlayerRole> players)
     {
         var w = new PacketWriter();
@@ -259,7 +254,6 @@ public static class Packets
         return (winner, reason, players);
     }
 
-    // ChatMessage: playerId: int, text: string (ТЗ 3.5)
     public static byte[] WriteChatMessage(int playerId, string text)
     {
         var w = new PacketWriter();
@@ -277,7 +271,6 @@ public static class Packets
         return (playerId, text);
     }
 
-    // Welcome: playerId: int (ТЗ 3.5)
     public static byte[] WriteWelcome(int playerId)
     {
         var w = new PacketWriter();
@@ -293,7 +286,6 @@ public static class Packets
         return playerId;
     }
 
-    // ServerDisconnect: reason: byte (ТЗ 3.5)
     public static byte[] WriteServerDisconnect(DisconnectReason reason)
     {
         var w = new PacketWriter();
@@ -309,7 +301,6 @@ public static class Packets
         return reason;
     }
 
-    // Error: code: byte, message: string (ТЗ 3.5)
     public static byte[] WriteError(ErrorCode code, string message)
     {
         var w = new PacketWriter();
@@ -327,23 +318,23 @@ public static class Packets
         return (code, message);
     }
 
-    // Input: inputSeq: uint, moveX: sbyte, moveY: sbyte, aimX: float, aimY: float, actions: byte (ТЗ 3.4)
+    // Input: inputSeq: uint, moveX: sbyte, moveY: sbyte, aimX: float, aimY: float, actions: byte — 15 байт
     public static byte[] WriteInput(uint inputSeq, InputState input)
     {
         var w = new PacketWriter();
-        w.WriteUInt(inputSeq); // 4 байта — номер пакета
-        w.WriteSByte(input.MoveX); // 1 байт  — −1 / 0 / 1
-        w.WriteSByte(input.MoveY); // 1 байт  — −1 / 0 / 1
-        w.WriteFloat(input.AimX); // 4 байта — прицел X
-        w.WriteFloat(input.AimY); // 4 байта — прицел Y
-        w.WriteByte(input.Actions); // 1 байт  — кнопки
-        return w.ToArray(); // 15 байт
+        w.WriteUInt(inputSeq);
+        w.WriteSByte(input.MoveX);
+        w.WriteSByte(input.MoveY);
+        w.WriteFloat(input.AimX);
+        w.WriteFloat(input.AimY);
+        w.WriteByte(input.Actions);
+        return w.ToArray();
     }
 
     public static (uint InputSeq, InputState Input) ReadInput(byte[] payload)
     {
         var r = new PacketReader(payload);
-        var inputSeq = r.ReadUInt();   // те же 6 полей, в том же порядке, что в WriteInput
+        var inputSeq = r.ReadUInt();
         var moveX = r.ReadSByte();
         var moveY = r.ReadSByte();
         var aimX = r.ReadFloat();
@@ -353,17 +344,16 @@ public static class Packets
         return (inputSeq, new InputState(moveX, moveY, aimX, aimY, actions));
     }
 
-    // Snapshot: tick: uint, timeLeft: ushort, список из (playerId: int, x, y, aimX, aimY: float, flags: byte),
-    // curseMask: byte, catchProgress: byte — поимка призрака в %, curseProgress: 5 × byte — проклятие каждого
-    // предмета в % (ТЗ 3.5). Число игроков оказывается в датаграмме по смещению 13: заголовок 7 + tick 4 + timeLeft 2;
-    // новые поля стоят в самом конце и это смещение не сдвигают.
+    // Snapshot: tick: uint, timeLeft: ushort, игроки по 22 байта (playerId: int, x, y, aimX, aimY: float, flags, charge: byte),
+    // curseMask: byte, catchProgress: byte, прогресс проклятия 5 × byte. Число игроков — байт 13 датаграммы
+    // (заголовок 7 + tick 4 + timeLeft 2), поэтому новые поля добавляются только в конец.
     public static byte[] WriteSnapshot(Snapshot snapshot)
     {
         var w = new PacketWriter();
         w.WriteUInt(snapshot.Tick);
         w.WriteUShort(snapshot.TimeLeft);
-        w.WriteByte((byte)snapshot.Players.Count); // список: сначала количество
-        foreach (var p in snapshot.Players)        // потом игроки подряд, по 21 байтам
+        w.WriteByte((byte)snapshot.Players.Count);
+        foreach (var p in snapshot.Players)
         {
             w.WriteInt(p.PlayerId);
             w.WriteFloat(p.X);
@@ -373,9 +363,9 @@ public static class Packets
             w.WriteByte(p.Flags); 
             w.WriteByte(p.Charge);
         }
-        w.WriteByte(snapshot.CurseMask);            // маска — после списка
-        w.WriteByte(snapshot.CatchProgress);        // поимка
-        for (var i = 0; i < Snapshot.ItemCount; i++) // проклятие каждого предмета — в самом конце, всегда 5 байт
+        w.WriteByte(snapshot.CurseMask);
+        w.WriteByte(snapshot.CatchProgress);
+        for (var i = 0; i < Snapshot.ItemCount; i++)
         {
             w.WriteByte(snapshot.CurseProgressOf(i));
         }

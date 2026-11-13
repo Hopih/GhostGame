@@ -17,7 +17,7 @@ var transport = new Transport(socketServer);
 Console.WriteLine($"Server listening on UDP port {port}");
 
 var buffer = new byte[PacketIO.ReceiveBufferSize];
-// цикл приёма и фоновая задача работают параллельно, поэтому ConcurrentDictionary (ТЗ 4.1)
+// цикл приёма и фоновая задача работают параллельно, поэтому ConcurrentDictionary
 var clients = new ConcurrentDictionary<IPEndPoint, ClientSession>();
 
 // Комнаты меняют и цикл приёма (JoinRoom…), и фоновая задача (таймаут игрока в комнате).
@@ -25,7 +25,7 @@ var clients = new ConcurrentDictionary<IPEndPoint, ClientSession>();
 var rooms = new Dictionary<int, Room>();
 var map = GameMap.Load();
 var roomsGate = new SemaphoreSlim(1, 1);
-const int MaxClients = 40; // 8 комнат по 5 игроков (ТЗ 4)
+const int MaxClients = 40; // 8 комнат по 5 игроков
 const int MaxRooms = 8;
 
 _ = Task.Run(MaintenanceLoopAsync);
@@ -46,12 +46,12 @@ while (true)
         {
             if (packet.Type != PacketType.Hello)
             {
-                // незнакомый адрес и не Hello — молча отбрасываем (ТЗ 4.5)
+                // незнакомый адрес и не Hello — молча отбрасываем
                 continue;
             }
             session = clients.GetOrAdd(from, endpoint => new ClientSession(new ReliableChannel(transport, endpoint) , endpoint));
         }
-        session.LastPing = Environment.TickCount64; //храним последнее время ответа
+        session.LastPing = Environment.TickCount64; // любой пакет продлевает сессию
 
         try
         {
@@ -89,7 +89,7 @@ async Task HandlePacketAsync(ClientSession session, IPEndPoint from, Packet pack
 
     if (packet.Type == PacketType.Ping)
     {
-        // Ping ходит на любом этапе и заодно не даёт сессии истечь (ТЗ 3.7)
+        // Ping ходит на любом этапе и заодно не даёт сессии истечь
         await transport.SendUnreliableAsync(PacketType.Pong, Packets.WritePong(Packets.ReadPing(packet.Payload)), from);
         return;
     }
@@ -149,7 +149,7 @@ async Task HandleHelloAsync(ClientSession session, IPEndPoint from, Packet packe
 
     if (session.IsJoined)
     {
-        // новый Hello от уже принятого игрока: второго игрока не создаём (ТЗ 3.7)
+        // новый Hello от уже принятого игрока: второго игрока не создаём
         await session.Channel.SendAsync(PacketType.Welcome, Packets.WriteWelcome(session.PlayerId));
         return;
     }
@@ -180,7 +180,7 @@ async Task HandleHelloAsync(ClientSession session, IPEndPoint from, Packet packe
     Console.WriteLine($"[{from}] {nick} подключился, id {session.PlayerId}");
 }
 
-// Всё про комнаты: список, создание, вход, выход, готовность, чат комнаты (ТЗ 4.2)
+// Всё про комнаты: список, создание, вход, выход, готовность, чат комнаты
 async Task HandleRoomPacketAsync(ClientSession session, IPEndPoint from, Packet packet)
 {
     await roomsGate.WaitAsync();
@@ -329,7 +329,7 @@ Task SendErrorAsync(ClientSession session, ErrorCode code, string message)
     return session.Channel.SendAsync(PacketType.Error, Packets.WriteError(code, message));
 }
 
-// Фоновая задача раз в 50 мс (ТЗ 4.1): повторы надёжного канала и таймауты сессий
+// Фоновая задача раз в 50 мс: повторы надёжного канала и таймауты сессий
 async Task MaintenanceLoopAsync()
 {
     while (true)
