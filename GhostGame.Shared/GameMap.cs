@@ -3,19 +3,6 @@ using System.Numerics;
 
 namespace GhostGame.Shared;
 
-// Карта особняка 64×40 клеток из текстового файла, одинакового у сервера и клиента.
-// Координаты в клетках: клетка (x, y) занимает квадрат от (x, y) до (x + 1, y + 1), её центр — (x + 0.5, y + 0.5).
-//
-// Символы:
-//   стены          #  W (с факелом)  V (со знаменем)  Y (с оружием)  E (парадный вход)
-//   пол            .  песок   ,  камень   =  паркет   ~  ковёр        D  дверной проём
-//   высокая мебель B книжный шкаф  K шкаф  S колонна              — не пройти, луч не проходит
-//   низкая мебель  T стол  P стол с зельями  b бочка  X крест  R надгробие  O котёл  N наковальня
-//                  A алтарь  F чаша с огнём                      — не пройти, луч светит поверх
-//   декор          c стул  s паук                                — можно ходить
-//   точки          1–5 предметы, G точка появления призрака, H точки появления охотников
-//
-// После 40 строк карты могут идти подписи комнат: «@x y Название» (x, y — центр подписи в клетках).
 public sealed class GameMap
 {
     public const int Width = 64;
@@ -27,7 +14,7 @@ public sealed class GameMap
     private const string LowFurniture = "TPbXRONAF";
     private const string AllowedCells = Walls + TallFurniture + LowFurniture + ".,=~Dcs12345GH";
 
-    private readonly char[,] cells; // cells[x, y]
+    private readonly char[,] cells;
 
     private GameMap(char[,] cells, Vector2 ghostSpawn, List<Vector2> hunterSpawns, Vector2[] items, List<MapLabel> labels)
     {
@@ -42,14 +29,12 @@ public sealed class GameMap
 
     public IReadOnlyList<Vector2> HunterSpawns { get; }
 
-    // Items[0] — предмет «1», …, Items[4] — предмет «5»; номер в списке совпадает с битом в curseMask
     public IReadOnlyList<Vector2> Items { get; }
 
     public IReadOnlyList<MapLabel> Labels { get; }
 
     public char this[int x, int y] => cells[x, y];
 
-    // Карта лежит рядом с программой: map.txt копируется в папку сборки сервера и клиента
     public static GameMap Load(string? path = null)
     {
         path ??= Path.Combine(AppContext.BaseDirectory, DefaultFileName);
@@ -143,19 +128,16 @@ public sealed class GameMap
         return labels;
     }
 
-    // Стена ли в клетке (в том числе стена с факелом, знаменем и т. п.); всё за краем карты тоже стена
     public bool IsWall(int x, int y)
     {
         return x < 0 || y < 0 || x >= Width || y >= Height || Walls.Contains(cells[x, y]);
     }
 
-    // Можно ли пройти через клетку: не стена и не мебель (стулья и пауки не мешают)
     public bool IsSolid(int x, int y)
     {
         return IsWall(x, y) || TallFurniture.Contains(cells[x, y]) || LowFurniture.Contains(cells[x, y]);
     }
 
-    // Закрывает ли клетка луч фонаря: стены и высокая мебель. Через стол или бочку светит.
     public bool BlocksLight(int x, int y)
     {
         return IsWall(x, y) || TallFurniture.Contains(cells[x, y]);

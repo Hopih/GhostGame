@@ -2,20 +2,16 @@ using System.Numerics;
 
 namespace GhostGame.Shared;
 
-// Фонарь охотника: конус длиной 5 клеток и шириной 60° в сторону прицела, сквозь стены не светит.
-// По нему сервер решает, видят ли охотники призрака и идёт ли поимка.
-// Включён ли фонарь (охотник держит ЛКМ), проверяет вызывающий — здесь только геометрия.
 public static class Flashlight
 {
-    public const float Length = 5f;         // клеток
-    public const float AngleDegrees = 60f;  // полная ширина конуса
-    private const float Step = 0.05f;       // шаг, с которым идём вдоль луча и ищем стены, в клетках
+    public const float Length = 5f;
+    public const float AngleDegrees = 60f;
+    private const float Step = 0.05f;
 
-    // Точка в конусе, если угол между «куда светим» и «где точка» не больше половины ширины, то есть 30°.
-    // Сравнивать удобнее косинусы: чем меньше угол, тем больше косинус. cos 30° ≈ 0,866.
     private static readonly float MinCos = MathF.Cos(AngleDegrees / 2 * MathF.PI / 180);
 
-    // Попадает ли точка target в луч фонаря, который стоит в from и светит в сторону aim. Всё в клетках.
+    // Попадает ли target в луч фонаря из from в сторону aim (всё в клетках): не дальше 5 клеток,
+    // не дальше 30° от прицела (сравниваем косинусы) и без стен и высокой мебели на пути.
     public static bool Covers(GameMap map, Vector2 from, Vector2 aim, Vector2 target)
     {
         var toTarget = target - from;
@@ -26,27 +22,24 @@ public static class Flashlight
         }
         if (distance < 0.001f)
         {
-            return true; // стоят в одной точке
+            return true;
         }
 
         var direction = aim - from;
         if (direction.Length() < 0.001f)
         {
-            return false; // мышь ровно на охотнике — непонятно, куда светить
+            return false;
         }
 
-        // Косинус угла между двумя направлениями — скалярное произведение векторов длины 1
         var cos = Vector2.Dot(Vector2.Normalize(direction), toTarget / distance);
         if (cos < MinCos)
         {
-            return false; // точка сбоку от конуса или сзади
+            return false;
         }
 
         return NoWallsBetween(map, from, target, distance);
     }
 
-    // Идём от фонаря к точке шагами по 0,05 клетки: попалась по пути стена или высокая мебель (шкаф, колонна) —
-    // луч до точки не доходит. Через дверной проём, стол или бочку светит.
     private static bool NoWallsBetween(GameMap map, Vector2 from, Vector2 target, float distance)
     {
         var steps = (int)(distance / Step);

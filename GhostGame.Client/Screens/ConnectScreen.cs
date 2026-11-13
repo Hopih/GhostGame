@@ -3,14 +3,11 @@ using Raylib_cs;
 
 namespace GhostGame.Client.Screens;
 
-// Экран подключения: заголовок игры, поля ника и адреса сервера, кнопка «Войти» поверх живого особняка.
-// Только рисует и читает нажатия, в сеть ничего не отправляет — что делать с ником и адресом, решает Program.cs.
 public sealed class ConnectScreen
 {
     private readonly TextInput nickInput = new(16, focused: true);
     private readonly TextInput serverInput = new(64);
 
-    // server — с чего начинается поле «Сервер»: адрес по умолчанию или из аргументов запуска
     public ConnectScreen(string server)
     {
         serverInput.Text = server;
@@ -20,8 +17,6 @@ public sealed class ConnectScreen
 
     public string Server => serverInput.Text.Trim();
 
-    // waiting — Hello уже отправлен, ждём Welcome: кнопка серая.
-    // Возвращает true в том кадре, когда нажали «Войти» или Enter и оба поля заполнены; что ввели — в Nick и Server.
     public bool Draw(bool waiting)
     {
         Ui.Backdrop();
@@ -36,7 +31,6 @@ public sealed class ConnectScreen
             serverInput.Focused = toServer;
         }
 
-        // мягкое тёмное пятно за заголовком и карточкой — читается на любом месте особняка
         Raylib.DrawCircleGradient((int)centerX, (int)(top + 220), 640, new Color(10, 6, 12, 150), new Color(10, 6, 12, 0));
         Ui.Title("Призрак и охотники", centerX, top, 80);
         Ui.TextCentered("сетевая игра на 3–5 игроков  ·  один из вас — призрак", centerX, top + 112, 22, Theme.Text);
@@ -54,7 +48,6 @@ public sealed class ConnectScreen
         Ui.TextCentered("WASD — ходить   ·   мышь — куда светить   ·   ЛКМ — фонарь или проклятие",
             centerX, card.Y + 342, 16, Theme.Muted);
 
-        // по бокам карточки: охотник с фонарём и парящий призрак
         var side = 150f;
         var hunter = new Rectangle(card.X - side - 40, card.Y + 80, side, side);
         Raylib.DrawEllipse((int)(hunter.X + side / 2), (int)(hunter.Y + side * 0.95f), side * 0.32f, side * 0.08f, Theme.Shadow);

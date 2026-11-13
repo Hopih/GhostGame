@@ -2,7 +2,6 @@ namespace GhostGame.Shared;
 
 public enum PacketType : byte
 {
-    // Клиент → сервер
     Hello = 0x01,
     Ping = 0x02,
     ClientDisconnect = 0x03,
@@ -14,10 +13,8 @@ public enum PacketType : byte
     Chat = 0x15,
     Input = 0x20,
 
-    // В обе стороны
     Ack = 0x7F,
 
-    // Сервер → клиент
     Welcome = 0x81,
     Pong = 0x82,
     ServerDisconnect = 0x83,

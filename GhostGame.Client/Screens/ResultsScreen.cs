@@ -4,11 +4,8 @@ using Raylib_cs;
 
 namespace GhostGame.Client.Screens;
 
-// Экран итогов раунда: победитель, причина, игроки и их роли, кнопка «В комнату».
-// Только рисует то, что пришло в GameOver. Возвращает true, когда нажали «В комнату».
 public sealed class ResultsScreen
 {
-    // nicks — playerId → ник, запомненные на старте раунда: отключившегося уже нет в RoomState, а в итогах он нужен
     public bool Draw(Role winner, GameOverReason reason, IReadOnlyList<PlayerRole> players,
         IReadOnlyDictionary<int, string> nicks, int myId)
     {
@@ -17,7 +14,6 @@ public sealed class ResultsScreen
         Ui.Panel(card);
         var centerX = card.X + card.Width / 2;
 
-        // кто победил — картинкой: парящий призрак или охотники в ряд
         if (winner == Role.Ghost)
         {
             var hover = MathF.Sin((float)Raylib.GetTime() * 2) * 6;
@@ -43,7 +39,6 @@ public sealed class ResultsScreen
             Ui.TextCentered(won ? "Вы победили!" : "Вы проиграли", centerX, card.Y + 218, 24, won ? Theme.Good : Theme.Error);
         }
 
-        // кто кем был: призрак первым, потом охотники
         var y = card.Y + 268;
         foreach (var p in players.OrderByDescending(p => p.Role))
         {

@@ -2,8 +2,6 @@ using GhostGame.Shared;
 
 namespace GhostGame.Server;
 
-// Состояние одного игрока в раунде: кто он, где стоит и что нажал последним.
-// Живёт только пока идёт раунд; данные подключения (ник, id, адрес) — в ClientSession.
 public class PlayerState
 {
     public PlayerState(ClientSession session, Role role, float x, float y)
@@ -20,26 +18,21 @@ public class PlayerState
 
     public float Battery = 0;
 
-    // позиция в клетках, меняется каждый тик
     public float X { get; set; }
     public float Y { get; set; }
 
-    // последний принятый Input: что игрок держит нажатым сейчас; пока ничего не прислал — стоит
     public InputState Input { get; set; } = InputState.Idle;
 
     public uint LastInputSeq { get; set; }
 
-    // когда пришёл последний Input: дольше 500 мс без Input — игрок стоит
     public long LastInputAt { get; set; }
 
-    // зажата ли ЛКМ в этом тике: у охотника это фонарь, у призрака — проклятие
     public bool PrimaryHeld { get; set; }
 
     public bool FlashlightOn { get; set; }
-    
+
     public bool Muted { get; set; }
 
-    // клеток в секунду
     public float Speed => Role == Role.Ghost ? 4.5f : 4f;
-    
+
 }

@@ -2,12 +2,8 @@ using Raylib_cs;
 
 namespace GhostGame.Client.Audio;
 
-// Все звуки клиента. Файлы — из паков Kenney (лицензия CC0, assets/sounds/kenney-audio-license.txt):
-// Interface Sounds, RPG Audio, Music Jingles. Загружаются один раз после InitWindow.
-// Нет файла или звуковой карты — играть просто нечего, игра от этого не падает.
 public static class Sfx
 {
-    // имена — это имена файлов в assets/sounds без .ogg
     public const string Click = "click_002";
     public const string Error = "error_006";
     public const string Chat = "pluck_001";
@@ -47,8 +43,6 @@ public static class Sfx
         }
     }
 
-    // Сыграть звук с громкостью volume (0–1) и высотой pitch (1 — как записан; меньше — ниже и медленнее).
-    // Если этот же звук ещё играет, он начнётся заново.
     public static void Play(string name, float volume = 1, float pitch = 1)
     {
         if (volume <= 0.01f || !Sounds.TryGetValue(name, out var sound))
@@ -60,13 +54,11 @@ public static class Sfx
         Raylib.PlaySound(sound);
     }
 
-    // Случайный звук из набора — чтобы шаги и скрипы не звучали одинаково
     public static void PlayAny(string[] names, float volume = 1, float pitch = 1)
     {
         Play(names[Random.Shared.Next(names.Length)], volume, pitch * (0.92f + 0.16f * Random.Shared.NextSingle()));
     }
 
-    // Раз в кадр. Окно без фокуса молчит: несколько клиентов на одном компьютере не звучат хором.
     public static void Update()
     {
         Raylib.SetMasterVolume(muted || !Raylib.IsWindowFocused() ? 0 : 1);

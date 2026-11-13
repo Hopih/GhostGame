@@ -3,7 +3,6 @@ using System.Net.Sockets;
 
 namespace GhostGame.Shared;
 
-// Единственная точка отправки датаграмм: через неё идут и надёжные пакеты (из ReliableChannel), и пакеты без гарантий
 public sealed class Transport
 {
     private readonly Socket socket;

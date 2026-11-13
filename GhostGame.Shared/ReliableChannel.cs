@@ -16,8 +16,8 @@ public sealed class ReliableChannel
 
     private uint nextSendSeq = 1;
     private uint nextExpected = 1;
-    private readonly Dictionary<uint, Pending> unacked = new(); // неподтверждённые пакеты
-    private readonly Dictionary<uint, Packet> outOfOrder = new(); // пакеты, пришедшие раньше своей очереди
+    private readonly Dictionary<uint, Pending> unacked = new();
+    private readonly Dictionary<uint, Packet> outOfOrder = new();
     private int totalResent;
 
     public ReliableChannel(Transport transport, EndPoint peer)
@@ -60,7 +60,8 @@ public sealed class ReliableChannel
         return transport.SendAsync(datagram, peer);
     }
 
-    // Приём: возвращает пакеты, которые можно обрабатывать прямо сейчас, по порядку (может быть пусто)
+    // Приём: отдаёт пакеты, которые можно обработать сейчас, по порядку. Дубликат — Ack ещё раз, без обработки;
+    // пришёл раньше своей очереди — в буфер (до 64); слишком далеко вперёд — без Ack, отправитель повторит.
     public async Task<IReadOnlyList<Packet>> ReceiveAsync(Packet packet)
     {
         if (packet.Type == PacketType.Ack)
@@ -89,7 +90,6 @@ public sealed class ReliableChannel
         {
             if (packet.Seq < nextExpected)
             {
-                // дубликат: уже обработан, но наш Ack мог потеряться — подтверждаем ещё раз
                 sendAck = true;
             }
             else if (packet.Seq == nextExpected)
@@ -101,24 +101,22 @@ public sealed class ReliableChannel
                 {
                     if (!outOfOrder.ContainsKey(nextExpected))
                     {
-                        break;                                 
+                        break;
                     }
 
-                    var next = outOfOrder[nextExpected];        
-                    outOfOrder.Remove(nextExpected);            
-                    ready.Add(next);                            
-                    nextExpected++;                             
+                    var next = outOfOrder[nextExpected];
+                    outOfOrder.Remove(nextExpected);
+                    ready.Add(next);
+                    nextExpected++;
                 }
             }
             else if (packet.Seq - nextExpected < MaxBuffered)
             {
-                // пришёл раньше предыдущего — ждёт в буфере
                 sendAck = true;
                 outOfOrder.TryAdd(packet.Seq, packet);
             }
             else
             {
-                // слишком далеко вперёд: не подтверждаем, отправитель повторит позже
                 sendAck = false;
             }
         }

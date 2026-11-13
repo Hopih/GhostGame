@@ -34,7 +34,6 @@ public static class Packets
         return text;
     }
 
-    // Ping: sentAt: long — время отправки у клиента, мс
     public static byte[] WritePing(long sentAt)
     {
         var w = new PacketWriter();
@@ -50,7 +49,6 @@ public static class Packets
         return sentAt;
     }
 
-    // Pong: sentAt — копия из Ping как есть
     public static byte[] WritePong(long sentAt)
     {
         return WritePing(sentAt);
@@ -75,8 +73,6 @@ public static class Packets
         r.EnsureEnd();
         return ackSeq;
     }
-
-    // ListRooms и LeaveRoom полей не имеют: данные пакета — Array.Empty<byte>()
 
     public static byte[] WriteCreateRoom(string name)
     {
@@ -108,9 +104,6 @@ public static class Packets
         return roomId;
     }
 
-    // SetReady полей не имеет: сервер сам переключает готовность
-
-    // RoomList: список из (roomId: int, name: string, players: byte, maxPlayers: byte, inGame: bool)
     public static byte[] WriteRoomList(List<RoomInfo> rooms)
     {
         var w = new PacketWriter();
@@ -146,7 +139,6 @@ public static class Packets
         return rooms;
     }
 
-    // RoomState: roomId: int, name: string, hostId: int, список из (playerId: int, nick: string, ready: bool)
     public static byte[] WriteRoomState(int roomId, string name, int hostId, List<RoomPlayer> players)
     {
         var w = new PacketWriter();
@@ -184,7 +176,6 @@ public static class Packets
         return (roomId, name, hostId, players);
     }
 
-    // GameStart: role: byte, roundSeconds: ushort, список из (playerId: int, x: float, y: float)
     public static byte[] WriteGameStart(Role role, ushort roundSeconds, List<PlayerSpawn> spawns)
     {
         var w = new PacketWriter();
@@ -220,7 +211,6 @@ public static class Packets
         return (role, roundSeconds, spawns);
     }
 
-    // GameOver: winner: byte (0 — охотники, 1 — призрак), reason: byte, список из (playerId: int, role: byte)
     public static byte[] WriteGameOver(Role winner, GameOverReason reason, List<PlayerRole> players)
     {
         var w = new PacketWriter();
@@ -360,7 +350,7 @@ public static class Packets
             w.WriteFloat(p.Y);
             w.WriteFloat(p.AimX);
             w.WriteFloat(p.AimY);
-            w.WriteByte(p.Flags); 
+            w.WriteByte(p.Flags);
             w.WriteByte(p.Charge);
         }
         w.WriteByte(snapshot.CurseMask);
@@ -400,4 +390,4 @@ public static class Packets
         r.EnsureEnd();
         return new Snapshot(tick, timeLeft, players, curseMask, catchProgress, curseProgress);
     }
-}    
+}

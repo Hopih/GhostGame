@@ -4,9 +4,6 @@ using Raylib_cs;
 
 namespace GhostGame.Client.Graphics;
 
-// Простейший интерфейс поверх Raylib-cs: текст, панели, кнопки, строки списка, поле ввода.
-// Всё рисуется заново каждый кадр между BeginDrawing и EndDrawing. Поэтому
-// if (Ui.Button(...)) { ... } одновременно рисует кнопку и сообщает, что по ней кликнули в этом кадре.
 public static class Ui
 {
     private const float Spacing = 1f;
@@ -21,7 +18,6 @@ public static class Ui
         Text(text, centerX - MeasureText(text, size) / 2, y, size, color);
     }
 
-    // Крупный заголовок: мягкая тень и золотая черта под текстом
     public static void Title(string text, float centerX, float y, float size)
     {
         var width = MeasureText(text, size);
@@ -37,7 +33,6 @@ public static class Ui
         return Raylib.MeasureTextEx(Assets.Font, text, size, Spacing).X;
     }
 
-    // Текст с переносом по словам в ширину width. Возвращает высоту, которую он занял.
     public static float Paragraph(string text, float x, float y, float width, float size, Color color)
     {
         var top = y;
@@ -64,14 +59,11 @@ public static class Ui
         return y - top;
     }
 
-    // Прямоугольник width × height по центру окна — в нём раскладываются меню
     public static Rectangle Center(float width, float height)
     {
         return new Rectangle((Raylib.GetScreenWidth() - width) / 2, (Raylib.GetScreenHeight() - height) / 2, width, height);
     }
 
-    // Фон меню: живой особняк (MenuBackdrop) под лёгкой вуалью, чтобы панели читались.
-    // Если особняк ещё не загружен — просто пол крупными плитками.
     public static void Backdrop()
     {
         if (MenuBackdrop.IsReady)
@@ -92,7 +84,6 @@ public static class Ui
         Raylib.DrawRectangle(0, 0, Raylib.GetScreenWidth(), Raylib.GetScreenHeight(), Theme.Veil);
     }
 
-    // Карточка-подложка: тень, скруглённые углы, рамка
     public static void Panel(Rectangle bounds)
     {
         var round = Roundness(bounds, 14);
@@ -101,15 +92,12 @@ public static class Ui
         Raylib.DrawRectangleRoundedLinesEx(bounds, round, 8, 2, Theme.PanelBorder);
     }
 
-    // Кнопка: true — по ней кликнули в этом кадре. enabled = false — серая и не нажимается.
-    // primary — главная кнопка экрана (песочная), остальные — кирпичные.
     public static bool Button(Rectangle bounds, string label, float size = 22, bool enabled = true, bool primary = false)
     {
         var hover = enabled && Raylib.CheckCollisionPointRec(Raylib.GetMousePosition(), bounds);
         var pressed = hover && Raylib.IsMouseButtonDown(MouseButton.Left);
         var round = Roundness(bounds, 10);
 
-        // «толщина» кнопки — тёмная полоса снизу; нажатая кнопка опускается на неё
         Raylib.DrawRectangleRounded(bounds with { Y = bounds.Y + 4 }, round, 8, Theme.Outline);
         var face = pressed ? bounds with { Y = bounds.Y + 3 } : bounds;
         var fill = !enabled ? Theme.ButtonDisabled
@@ -128,7 +116,6 @@ public static class Ui
         return clicked;
     }
 
-    // Строка списка, по которой можно кликнуть. Рисует только подложку, содержимое рисует вызывающий.
     public static bool Row(Rectangle bounds, bool enabled, bool highlighted = false)
     {
         var hover = enabled && Raylib.CheckCollisionPointRec(Raylib.GetMousePosition(), bounds);
@@ -136,7 +123,6 @@ public static class Ui
         return hover && Raylib.IsMouseButtonPressed(MouseButton.Left);
     }
 
-    // Маленькая цветная метка («готов», «идёт игра»). rightX — где должен кончаться её правый край.
     public static void Chip(string text, float rightX, float y, Color color, float size = 18)
     {
         var width = MeasureText(text, size) + 20;
@@ -145,20 +131,18 @@ public static class Ui
         Text(text, bounds.X + 10, bounds.Y + 5, size, color);
     }
 
-    // Полоска прогресса: fraction от 0 до 1 — какая часть залита цветом color
     public static void ProgressBar(Rectangle bounds, float fraction, Color color)
     {
         var round = Roundness(bounds, bounds.Height / 2);
         Raylib.DrawRectangleRounded(bounds, round, 8, Theme.Field);
         var filled = bounds with { Width = bounds.Width * Math.Clamp(fraction, 0f, 1f) };
-        if (filled.Width >= bounds.Height) // совсем короткая заливка со скруглением рисуется кляксой — не рисуем
+        if (filled.Width >= bounds.Height)
         {
             Raylib.DrawRectangleRounded(filled, Roundness(filled, bounds.Height / 2), 8, color);
         }
         Raylib.DrawRectangleRoundedLinesEx(bounds, round, 8, 1, Theme.Outline);
     }
 
-    // Строка статуса внизу окна: ошибки красным, остальное серым
     public static void StatusLine(string text, bool isError)
     {
         const float size = 22;
@@ -167,15 +151,12 @@ public static class Ui
         Text(text, bounds.X + 16, bounds.Y + 8, size, isError ? Theme.Error : Theme.Text);
     }
 
-    // Raylib задаёт скругление долей от меньшей стороны; переводим из «радиус в пикселях»
     private static float Roundness(Rectangle bounds, float radius)
     {
         return Math.Min(1f, 2 * radius / Math.Min(bounds.Width, bounds.Height));
     }
 }
 
-// Поле ввода: клик — поле получает фокус, печатать с клавиатуры (кириллица тоже), Backspace стирает, Enter — «готово».
-// Экземпляр живёт между кадрами (в нём хранится набранный текст), Draw вызывается каждый кадр.
 public sealed class TextInput
 {
     public TextInput(int maxLength, bool focused = false)
@@ -190,7 +171,6 @@ public sealed class TextInput
 
     public bool Focused { get; set; }
 
-    // Рисует поле и обрабатывает ввод. Возвращает true в том кадре, когда нажали Enter и текст не пустой.
     public bool Draw(Rectangle bounds, string placeholder = "", float size = 22)
     {
         if (Raylib.IsMouseButtonPressed(MouseButton.Left))
@@ -201,7 +181,6 @@ public sealed class TextInput
         var submitted = false;
         if (Focused)
         {
-            // GetCharPressed отдаёт по одному символу, набранному за кадр, и 0, когда символы кончились
             var ch = Raylib.GetCharPressed();
             while (ch > 0)
             {
@@ -212,7 +191,6 @@ public sealed class TextInput
                 ch = Raylib.GetCharPressed();
             }
 
-            // IsKeyPressedRepeat — чтобы зажатый Backspace стирал несколько символов
             if ((Raylib.IsKeyPressed(KeyboardKey.Backspace) || Raylib.IsKeyPressedRepeat(KeyboardKey.Backspace)) && Text.Length > 0)
             {
                 Text = Text[..^1];
@@ -235,7 +213,6 @@ public sealed class TextInput
         }
         else
         {
-            // мигающий курсор; длинный текст сдвигаем влево, чтобы был виден конец
             var shown = Text + (Focused && Raylib.GetTime() % 1 < 0.5 ? "|" : "");
             var overflow = MathF.Max(0, Ui.MeasureText(shown, size) - (bounds.Width - 28));
             Raylib.BeginScissorMode((int)bounds.X + 4, (int)bounds.Y, (int)bounds.Width - 8, (int)bounds.Height);

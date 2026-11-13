@@ -4,7 +4,6 @@ using Raylib_cs;
 
 namespace GhostGame.Client.Screens;
 
-// Что игрок сделал в лобби в этом кадре. Program.cs превращает это в пакеты.
 public abstract record LobbyAction
 {
     public sealed record Join(int RoomId) : LobbyAction;
@@ -12,29 +11,25 @@ public abstract record LobbyAction
     public sealed record Refresh() : LobbyAction;
 }
 
-// Экран лобби: список комнат и создание своей. Только рисует и сообщает, что нажали.
 public sealed class LobbyScreen
 {
     private readonly TextInput roomNameInput = new(24);
 
     public void Focus() => roomNameInput.Focused = true;
 
-    // Возвращает действие игрока или null, если в этом кадре ничего не нажали
     public LobbyAction? Draw(IReadOnlyList<RoomInfo> rooms, string nick, int myId, long pingMs)
     {
-        LobbyAction? action = null; // рисуем экран целиком, даже если кнопку уже нажали, и только потом отвечаем
+        LobbyAction? action = null;
 
         Ui.Backdrop();
         var frame = Ui.Center(1180, 700);
 
-        // шапка: заголовок слева, кто я — справа
         Ui.Text("Лобби", frame.X, frame.Y, 48);
         var me = $"{nick}   ·   id {myId}   ·   пинг {(pingMs < 0 ? "—" : $"{pingMs} мс")}";
         var meX = frame.X + frame.Width - Ui.MeasureText(me, 20);
         Ui.Text(me, meX, frame.Y + 20, 20, Theme.Muted);
         Assets.DrawSprite(Sprites.Hunter(myId), new Rectangle(meX - 50, frame.Y + 8, 40, 40));
 
-        // список комнат
         var list = new Rectangle(frame.X, frame.Y + 80, 740, 620);
         Ui.Panel(list);
         Ui.Text("Комнаты", list.X + 24, list.Y + 18, 28);
@@ -58,7 +53,6 @@ public sealed class LobbyScreen
             }
             Ui.Text(r.Name, row.X + 18, row.Y + 14, 24, open ? Theme.Text : Theme.Muted);
 
-            // сколько мест занято: фигурки на занятых местах, бледные — на свободных
             for (var k = 0; k < r.MaxPlayers; k++)
             {
                 var slot = new Rectangle(row.X + 330 + k * 30, row.Y + 12, 32, 32);
@@ -70,7 +64,6 @@ public sealed class LobbyScreen
             Ui.Chip(label, row.X + row.Width - 14, row.Y + 13, color);
         }
 
-        // новая комната
         var create = new Rectangle(frame.X + 770, frame.Y + 80, 410, 230);
         Ui.Panel(create);
         Ui.Text("Новая комната", create.X + 24, create.Y + 18, 28);
@@ -82,7 +75,6 @@ public sealed class LobbyScreen
             roomNameInput.Text = "";
         }
 
-        // коротко о правилах
         var rules = new Rectangle(frame.X + 770, frame.Y + 330, 410, 370);
         Ui.Panel(rules);
         Ui.Text("Как играть", rules.X + 24, rules.Y + 18, 28);

@@ -17,7 +17,6 @@ var transport = new Transport(socketServer);
 Console.WriteLine($"Server listening on UDP port {port}");
 
 var buffer = new byte[PacketIO.ReceiveBufferSize];
-// цикл приёма и фоновая задача работают параллельно, поэтому ConcurrentDictionary
 var clients = new ConcurrentDictionary<IPEndPoint, ClientSession>();
 
 // Комнаты меняют и цикл приёма (JoinRoom…), и фоновая задача (таймаут игрока в комнате).
@@ -25,7 +24,7 @@ var clients = new ConcurrentDictionary<IPEndPoint, ClientSession>();
 var rooms = new Dictionary<int, Room>();
 var map = GameMap.Load();
 var roomsGate = new SemaphoreSlim(1, 1);
-const int MaxClients = 40; // 8 комнат по 5 игроков
+const int MaxClients = 40;
 const int MaxRooms = 8;
 
 _ = Task.Run(MaintenanceLoopAsync);
@@ -46,12 +45,11 @@ while (true)
         {
             if (packet.Type != PacketType.Hello)
             {
-                // незнакомый адрес и не Hello — молча отбрасываем
                 continue;
             }
             session = clients.GetOrAdd(from, endpoint => new ClientSession(new ReliableChannel(transport, endpoint) , endpoint));
         }
-        session.LastPing = Environment.TickCount64; // любой пакет продлевает сессию
+        session.LastPing = Environment.TickCount64;
 
         try
         {
@@ -89,7 +87,6 @@ async Task HandlePacketAsync(ClientSession session, IPEndPoint from, Packet pack
 
     if (packet.Type == PacketType.Ping)
     {
-        // Ping ходит на любом этапе и заодно не даёт сессии истечь
         await transport.SendUnreliableAsync(PacketType.Pong, Packets.WritePong(Packets.ReadPing(packet.Payload)), from);
         return;
     }
@@ -119,7 +116,6 @@ async Task HandlePacketAsync(ClientSession session, IPEndPoint from, Packet pack
             break;
 
         case PacketType.Input:
-            // Input без гарантий: канал отдал его сразу, устаревшие отсеет ApplyInput по inputSeq
             var (inputSeq, input) = Packets.ReadInput(packet.Payload);
             await roomsGate.WaitAsync();
             try
@@ -149,7 +145,6 @@ async Task HandleHelloAsync(ClientSession session, IPEndPoint from, Packet packe
 
     if (session.IsJoined)
     {
-        // новый Hello от уже принятого игрока: второго игрока не создаём
         await session.Channel.SendAsync(PacketType.Welcome, Packets.WriteWelcome(session.PlayerId));
         return;
     }
@@ -180,13 +175,12 @@ async Task HandleHelloAsync(ClientSession session, IPEndPoint from, Packet packe
     Console.WriteLine($"[{from}] {nick} подключился, id {session.PlayerId}");
 }
 
-// Всё про комнаты: список, создание, вход, выход, готовность, чат комнаты
 async Task HandleRoomPacketAsync(ClientSession session, IPEndPoint from, Packet packet)
 {
     await roomsGate.WaitAsync();
     try
     {
-        rooms.TryGetValue(session.RoomId, out var room); // комната игрока или null, если он в лобби
+        rooms.TryGetValue(session.RoomId, out var room);
 
         switch (packet.Type)
         {
@@ -289,7 +283,7 @@ async Task HandleRoomPacketAsync(ClientSession session, IPEndPoint from, Packet 
     }
     finally
     {
-        roomsGate.Release(); // finally: даже если вылетело исключение, иначе комнаты встанут навсегда
+        roomsGate.Release();
     }
 }
 
@@ -307,7 +301,6 @@ async Task LeaveRoomAsync(ClientSession session, Room room)
     await room.BroadcastStateAsync();
 }
 
-// Игрок отключился (Disconnect или таймаут) — убрать его из комнаты, если он в ней был
 async Task RemoveFromRoomAsync(ClientSession session)
 {
     await roomsGate.WaitAsync();
@@ -346,7 +339,7 @@ async Task MaintenanceLoopAsync()
                 }
 
                 var silent = Environment.TickCount64 - session.LastPing > 10_000;
-                
+
                 if ((failed || silent) && clients.TryRemove(endpoint, out _))
                 {
                     var reason = failed ? "нет подтверждений 10 с" : "таймаут";

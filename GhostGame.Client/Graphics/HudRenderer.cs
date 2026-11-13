@@ -5,10 +5,8 @@ using Raylib_cs;
 
 namespace GhostGame.Client.Graphics;
 
-// Панель справа от карты: роль, таймер, поимка, проклятые предметы, мини-карта, игроки, пинг, подсказка
 public static class HudRenderer
 {
-    // snapshot — время, поимка, маска и прогресс проклятий; cursing[i] — сундук i проклинают прямо сейчас
     public static void Draw(GameLayout layout, GameMap map, IReadOnlyList<PlayerView> players, Role myRole, int myId,
         Snapshot snapshot, IReadOnlyList<bool> cursing, IReadOnlyList<RosterEntry> roster, long pingMs)
     {
@@ -32,19 +30,16 @@ public static class HudRenderer
         Ui.Text(myRole == Role.Ghost ? "Вы — призрак" : "Вы — охотник", x + 50, y + 8, 22);
         y += 60;
 
-        // таймер; последние 30 секунд — красным
         Ui.Text("ВРЕМЯ", x, y, 16, Theme.Muted);
         Ui.Text($"{timeLeft / 60}:{timeLeft % 60:00}", x, y + 16, 52, timeLeft <= 30 ? Theme.Error : Theme.Text);
         y += 84;
 
-        // поимка: сколько призрак уже простоял в лучах. Призраку — тревога, охотникам — сколько осталось дожать.
         Ui.Text(myRole == Role.Ghost ? $"ВАС ЛОВЯТ  {catchProgress}%" : $"ПОИМКА  {catchProgress}%", x, y, 16,
             myRole == Role.Ghost && catchProgress > 0 ? Theme.Error : Theme.Muted);
         Ui.ProgressBar(new Rectangle(x, y + 22, width, 14), catchProgress / 100f,
             myRole == Role.Ghost ? Theme.Error : Theme.Accent);
         y += 54;
 
-        // охотнику — заряд своего фонаря; сел — красная полоска, пока не остынет до конца
         var me = players.FirstOrDefault(p => p.IsMe);
         if (myRole == Role.Hunter && me.IsMe)
         {
@@ -56,8 +51,6 @@ public static class HudRenderer
             y += 54;
         }
 
-        // проклятые предметы: сундук — цел, мимик — проклят, под сундуком — сколько уже набрано;
-        // тот, что проклинают прямо сейчас, мигает. Призраку для победы нужно 3.
         var anyCursing = cursing.Any(c => c);
         Ui.Text(anyCursing ? $"ПРОКЛИНАЮТ!  {BitOperations.PopCount(curseMask)} / 3" : $"ПРОКЛЯТО  {BitOperations.PopCount(curseMask)} / 3",
             x, y, 16, anyCursing ? Theme.CurseGlow with { A = 255 } : Theme.Muted);
@@ -107,15 +100,12 @@ public static class HudRenderer
         Ui.Paragraph(hint, x, y, width, 17, Theme.Muted);
     }
 
-    // Мини-карта: весь особняк по клетке на несколько пикселей, сундуки, видимые игроки и рамка «что сейчас в окне».
-    // Игроки — те же, что и на экране, поэтому охотник видит на ней призрака, только пока тот в луче (туман войны).
-    // Возвращает высоту, которую заняла.
     private static float DrawMinimap(GameLayout layout, GameMap map, IReadOnlyList<PlayerView> players, byte curseMask,
         IReadOnlyList<bool> cursing, float x, float y, float width)
     {
         Ui.Text("КАРТА", x, y, 16, Theme.Muted);
         var top = y + 22;
-        var dot = MathF.Max(1, MathF.Floor(width / GameMap.Width)); // пикселей на клетку — целое, чтобы не было швов
+        var dot = MathF.Max(1, MathF.Floor(width / GameMap.Width));
         var left = x + (width - dot * GameMap.Width) / 2;
         Vector2 At(Vector2 cells) => new(left + cells.X * dot, top + cells.Y * dot);
 
@@ -142,7 +132,6 @@ public static class HudRenderer
             var cursed = (curseMask & (1 << i)) != 0;
             if (cursing[i])
             {
-                // сундук проклинают — на мини-карте он пульсирует: охотники видят, куда бежать
                 var ring = dot * (2 + 2 * (float)(Raylib.GetTime() * 3 % 1));
                 Raylib.DrawCircleLinesV(At(map.Items[i]), ring, Theme.CurseGlow with { A = 255 });
             }
@@ -154,7 +143,6 @@ public static class HudRenderer
             Raylib.DrawCircleV(At(p.Position), dot * (p.IsMe ? 1.8f : 1.4f), color);
         }
 
-        // какая часть карты сейчас в окне
         var view = layout.Viewport;
         var a = layout.ToCells(new Vector2(view.X, view.Y));
         var b = layout.ToCells(new Vector2(view.X + view.Width, view.Y + view.Height));
@@ -166,7 +154,6 @@ public static class HudRenderer
         return 22 + dot * GameMap.Height;
     }
 
-    // Время раунда вышло: затемнить окно в мир и показать окошко. true — нажали «В комнату».
     public static bool DrawRoundOver(GameLayout layout)
     {
         var view = layout.Viewport;

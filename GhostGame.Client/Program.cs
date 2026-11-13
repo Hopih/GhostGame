@@ -7,27 +7,23 @@ using GhostGame.Client.Screens;
 using GhostGame.Shared;
 using Raylib_cs;
 
-// Адрес сервера вводится на экране входа. По умолчанию — наш сервер на VPS (Docker);
-// аргументы запуска «ip [порт]» только подставляют в поле другой адрес (удобно в Rider: 127.0.0.1 5000).
 const string DefaultServer = "45.154.185.149:5000";
 const int DefaultPort = 5000;
 var serverText = args.Length > 0 ? args[0] + (args.Length > 1 ? $":{args[1]}" : "") : DefaultServer;
-var server = new IPEndPoint(IPAddress.Loopback, DefaultPort); // настоящий адрес берётся из поля при нажатии «Войти»
+var server = new IPEndPoint(IPAddress.Loopback, DefaultPort);
 var map = GameMap.Load();
 
-// --- сеть: сокет, канал и очередь входящих создаются заново на каждое подключение ---
 Socket? socket = null;
 Transport? transport = null;
 ReliableChannel? channel = null;
-var incoming = System.Threading.Channels.Channel.CreateUnbounded<Packet>(); // приём кладёт сюда, главный поток разбирает
-var lastHeard = 0L;        // когда последний раз что-то пришло от сервера (пишет фоновый приём)
+var incoming = System.Threading.Channels.Channel.CreateUnbounded<Packet>();
+var lastHeard = 0L;
 var pingMs = -1L;
-var channelFailed = false; // надёжный пакет не подтверждён 10 с (ставит фоновая задача повторов)
+var channelFailed = false;
 
-// --- что сейчас на экране и что клиент знает ---
 var screen = Screen.Connect;
-var connected = false;      // Welcome получен
-var helloSentAt = -1L;      // когда отправили Hello; -1 — Welcome не ждём
+var connected = false;
+var helloSentAt = -1L;
 var myId = 0;
 var status = "";
 var statusUntil = 0L;
@@ -36,32 +32,28 @@ var lastRoomsRequest = 0L;
 (int RoomId, string Name, int HostId, List<RoomPlayer> Players)? room = null;
 var chat = new List<string>();
 GameScreen? game = null;
-var roundNicks = new Dictionary<int, string>(); // ники участников раунда на момент GameStart — для экрана итогов
+var roundNicks = new Dictionary<int, string>();
 (Role Winner, GameOverReason Reason, List<PlayerRole> Players)? result = null;
 uint inputSeq = 0;
 var lastInputAt = 0L;
 var lastPingAt = 0L;
 
 Raylib.SetTraceLogLevel(TraceLogLevel.Warning);
-// Окно развёрнуто на весь экран, но его можно уменьшить и растягивать — экраны раскладываются от размера окна.
 Raylib.SetConfigFlags(ConfigFlags.ResizableWindow | ConfigFlags.Msaa4xHint);
 Raylib.InitWindow(1600, 900, "Призрак и охотники");
 Raylib.MaximizeWindow();
 Raylib.SetWindowMinSize(1240, 780);
 Raylib.SetTargetFPS(60);
-Raylib.SetExitKey(KeyboardKey.Null); // Esc не закрывает окно
-Assets.Load(); // спрайты и шрифт — только после InitWindow
+Raylib.SetExitKey(KeyboardKey.Null);
+Assets.Load();
 MenuBackdrop.Init(map);
-Sfx.Load();             // звуки — тоже после InitWindow
+Sfx.Load();
 
-// Экраны меню: только рисуют и сообщают, что нажали. Что отправить серверу, решает этот файл.
 var connectScreen = new ConnectScreen(serverText);
 var lobbyScreen = new LobbyScreen();
 var roomScreen = new RoomScreen();
 var resultsScreen = new ResultsScreen();
 
-// Главный цикл кадров. Всё, что связано с окном, — только здесь, в главном потоке.
-// Поэтому здесь нет await: после await код мог бы продолжиться в другом потоке, а Raylib работает только в этом.
 while (!Raylib.WindowShouldClose())
 {
     var now = Environment.TickCount64;
@@ -83,7 +75,6 @@ while (!Raylib.WindowShouldClose())
     Raylib.EndDrawing();
 }
 
-// окно закрыли: 3 копии Disconnect — хотя бы одна должна дойти
 if (connected && transport != null)
 {
     for (var i = 0; i < 3; i++)
@@ -95,9 +86,6 @@ Sfx.Unload();
 Raylib.CloseWindow();
 socket?.Close();
 
-// ===================== сеть =====================
-
-// Отправка из главного потока «запустил и пошёл дальше»: отправка UDP быстрая, ждать её кадру незачем
 void Send(PacketType type, byte[] payload)
 {
     if (channel != null)
@@ -126,7 +114,6 @@ void Connect(string nick, string address)
     }
     if (channel != null && !endpoint.Equals(server))
     {
-        // после неудачной попытки (например, ник занят) поменяли адрес — старое подключение бросаем
         channel = null;
         transport = null;
         socket?.Close();
@@ -136,7 +123,7 @@ void Connect(string nick, string address)
     {
         server = endpoint;
         socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-        socket.Bind(new IPEndPoint(IPAddress.Any, 0)); // порт выбирает ОС — можно запустить несколько клиентов
+        socket.Bind(new IPEndPoint(IPAddress.Any, 0));
         transport = new Transport(socket);
         channel = new ReliableChannel(transport, server);
         incoming = System.Threading.Channels.Channel.CreateUnbounded<Packet>();
@@ -151,7 +138,6 @@ void Connect(string nick, string address)
     ShowStatus("Подключение…");
 }
 
-// «ip», «ip:порт», «имя», «имя:порт» → адрес сервера; не разобрали — null. Порт не указан — 5000.
 static IPEndPoint? ParseServer(string text)
 {
     var host = text.Trim();
@@ -173,7 +159,6 @@ static IPEndPoint? ParseServer(string text)
     {
         try
         {
-            // сокет у клиента IPv4 — берём IPv4-адрес имени
             ip = Dns.GetHostAddresses(host).FirstOrDefault(a => a.AddressFamily == AddressFamily.InterNetwork);
         }
         catch (Exception e) when (e is SocketException or ArgumentException)
@@ -184,12 +169,11 @@ static IPEndPoint? ParseServer(string text)
     return ip == null ? null : new IPEndPoint(ip, port);
 }
 
-// Вернуться на экран подключения: сервер не отвечает, связь потеряна или сервер отключил
 void Disconnect(string reason)
 {
     connected = false;
     helloSentAt = -1;
-    channel = null;      // фоновые задачи старого подключения увидят это и закончатся
+    channel = null;
     transport = null;
     socket?.Close();
     socket = null;
@@ -236,7 +220,6 @@ void HandlePackets()
         }
         catch (MalformedPacketException)
         {
-            // битый пакет от сервера пропускаем, следующий разберётся нормально
         }
     }
 }
@@ -259,7 +242,7 @@ void HandlePacket(Packet packet)
             var (_, message) = Packets.ReadError(packet.Payload);
             if (!connected)
             {
-                helloSentAt = -1; // ответ на Hello: можно ввести другой ник
+                helloSentAt = -1;
             }
             ShowStatus($"Ошибка: {message}");
             Sfx.Play(Sfx.Error, 0.6f);
@@ -303,7 +286,6 @@ void HandlePacket(Packet packet)
             break;
 
         case PacketType.GameOver:
-            // конец раунда: показываем итоги; Snapshot, если ещё придут, вне экрана игры игнорируются
             result = Packets.ReadGameOver(packet.Payload);
             game = null;
             screen = Screen.Results;
@@ -312,7 +294,6 @@ void HandlePacket(Packet packet)
             break;
 
         case PacketType.Snapshot:
-            // Snapshot без гарантий и может обогнать GameStart — вне экрана игры его просто игнорируем
             if (screen == Screen.Game && game != null)
             {
                 game.ApplySnapshot(Packets.ReadSnapshot(packet.Payload));
@@ -361,15 +342,13 @@ async Task ReceiveLoopAsync(Socket s, ReliableChannel ch, System.Threading.Chann
         }
         catch (SocketException e) when (e.SocketErrorCode == SocketError.ConnectionReset)
         {
-            // Windows так сообщает, что на порту сервера никто не слушает; экран скажет «Сервер не отвечает»
         }
         catch (MalformedPacketException)
         {
-            // битая датаграмма от сервера — пропускаем
         }
         catch (ObjectDisposedException)
         {
-            return; // сокет закрыли — это подключение закончилось
+            return;
         }
     }
 }
@@ -383,14 +362,10 @@ async Task ResendLoopAsync(ReliableChannel ch)
         var (_, failed) = await ch.ResendAsync();
         if (failed)
         {
-            channelFailed = true; // главный поток увидит и вернётся на экран подключения
+            channelFailed = true;
         }
     }
 }
-
-// ===================== экраны =====================
-// Каждая функция — один кадр своего экрана: экран рисует себя и сообщает, что нажали,
-// а здесь решаем, какой пакет отправить и куда перейти. Сами экраны про сеть ничего не знают.
 
 void ConnectFrame()
 {
@@ -404,7 +379,7 @@ void LobbyFrame(long now)
 {
     if (now - lastRoomsRequest > 3000)
     {
-        RequestRooms(); // список комнат сам обновляется раз в 3 с
+        RequestRooms();
     }
 
     switch (lobbyScreen.Draw(rooms, connectScreen.Nick, myId, pingMs))
@@ -431,10 +406,9 @@ void RoomFrame()
     switch (roomScreen.Draw(r.Name, r.HostId, r.Players, myId, chat))
     {
         case RoomAction.ToggleReady:
-            Send(PacketType.SetReady, Array.Empty<byte>()); // сервер переключит и пришлёт RoomState
+            Send(PacketType.SetReady, Array.Empty<byte>());
             break;
         case RoomAction.Leave:
-            // выходящему сервер RoomState не присылает — он уже не в комнате, поэтому уходим в лобби сами
             Send(PacketType.LeaveRoom, Array.Empty<byte>());
             room = null;
             chat.Clear();
@@ -455,19 +429,18 @@ void GameFrame(long now)
         return;
     }
 
-    // Input 20 раз в секунду независимо от частоты кадров, inputSeq растёт; без гарантий
     if (now - lastInputAt >= 50)
     {
         lastInputAt = now;
         SendUnreliable(PacketType.Input, Packets.WriteInput(++inputSeq, game.ReadInput()));
     }
 
-    if (Raylib.IsKeyPressed(KeyboardKey.M)) // в игре полей ввода нет, поэтому M можно отдать под звук
+    if (Raylib.IsKeyPressed(KeyboardKey.M))
     {
         Sfx.ToggleMute();
     }
 
-    if (game.Draw(pingMs)) // время вышло и нажали «В комнату»
+    if (game.Draw(pingMs))
     {
         game = null;
         screen = room != null ? Screen.Room : Screen.Lobby;

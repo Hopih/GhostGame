@@ -12,7 +12,8 @@ public static class PacketIO
     public const int HeaderSize = 7;
     public const int MaxDatagramSize = 1200;
     public const int ReceiveBufferSize = 2048;
-    
+
+    // Датаграмма = заголовок 7 байт (magic 0x4748, тип, seq; big-endian) + нагрузка, всего не больше 1200 байт
     public static byte[] Build(PacketType type, uint seq, ReadOnlySpan<byte> payload)
     {
         if (HeaderSize + payload.Length > MaxDatagramSize)
@@ -27,6 +28,7 @@ public static class PacketIO
         return packet;
     }
 
+    // null — не наш пакет: короче заголовка, чужой magic или неизвестный тип
     public static Packet? Parse(ReadOnlySpan<byte> datagram)
     {
         if (datagram.Length < HeaderSize || BinaryPrimitives.ReadUInt16BigEndian(datagram) != Magic)
@@ -50,7 +52,8 @@ public static class PacketIO
         var from = (IPEndPoint)result.RemoteEndPoint;
         return (Parse(buffer.AsSpan(0, result.ReceivedBytes)), from);
     }
-    
+
+    // Windows: иначе ICMP «порт недоступен» от закрытого клиента роняет ReceiveFrom общего сокета (ошибка 10054)
     public static void DisableConnectionReset(Socket socket)
     {
         if (OperatingSystem.IsWindows())

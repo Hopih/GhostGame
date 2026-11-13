@@ -4,8 +4,6 @@ using Raylib_cs;
 
 namespace GhostGame.Client.Graphics;
 
-// Пол, стены, мебель, двери, факелы, подписи комнат и предметы — всё по символам map.txt.
-// Рисуются только клетки, которые сейчас попадают в окно: карта больше экрана.
 public static class MapRenderer
 {
     private enum Side
@@ -15,12 +13,10 @@ public static class MapRenderer
         Top,
     }
 
-    // snapshot — откуда маска и прогресс проклятий; cursing[i] — сундук i проклинают прямо сейчас
     public static void Draw(GameMap map, GameLayout layout, Snapshot snapshot, IReadOnlyList<bool> cursing, double time)
     {
         var (left, top, right, bottom) = layout.VisibleCells();
 
-        // проход 1: пол везде, где не стена (под мебелью и дверью — пол её комнаты)
         for (var y = top; y <= bottom; y++)
         {
             for (var x = left; x <= right; x++)
@@ -33,7 +29,6 @@ public static class MapRenderer
         }
         DrawLabels(map, layout);
 
-        // проход 2: стены, двери, мебель и декор поверх пола
         for (var y = top; y <= bottom; y++)
         {
             for (var x = left; x <= right; x++)
@@ -56,7 +51,6 @@ public static class MapRenderer
         DrawItems(map, layout, snapshot, cursing, time);
     }
 
-    // Где на карте источники света: факел светит в комнату под собой, чаша с огнём — вокруг себя
     public static List<Vector2> FindLamps(GameMap map)
     {
         var lamps = new List<Vector2>();
@@ -77,12 +71,8 @@ public static class MapRenderer
         return lamps;
     }
 
-    // ---------- пол ----------
-
     private static bool IsFloor(char c) => c is '.' or ',' or '=' or '~';
 
-    // Какой пол в клетке. Под мебелью, дверью или предметом — тот пол, которого больше всего среди 8 соседей;
-    // при равенстве — не ковёр, чтобы ковёр не «вытекал» под стулья, стоящие у его края.
     private static char FloorOf(GameMap map, int x, int y)
     {
         if (IsFloor(map[x, y]))
@@ -106,7 +96,7 @@ public static class MapRenderer
             }
             if (count > bestCount)
             {
-                (best, bestCount) = (floor, count); // ковёр проверяется последним и побеждает только при перевесе
+                (best, bestCount) = (floor, count);
             }
         }
         return best;
@@ -114,7 +104,7 @@ public static class MapRenderer
 
     private static void DrawFloor(GameMap map, int x, int y, Rectangle dest, int cell)
     {
-        var px = cell / (float)Assets.SpriteSize; // один пиксель спрайта на экране
+        var px = cell / (float)Assets.SpriteSize;
         switch (FloorOf(map, x, y))
         {
             case ',':
@@ -132,14 +122,12 @@ public static class MapRenderer
         }
     }
 
-    // Песок: изредка крапинки и камешки. Зависит только от (x, y), поэтому от кадра к кадру не мигает.
     private static int SandSprite(int x, int y)
     {
         var n = Hash(x, y) % 41;
         return n == 0 ? Sprites.FloorStones : n < 6 ? Sprites.FloorDots : Sprites.Floor;
     }
 
-    // Каменные плиты: 4 плитки на клетку, у каждой свой оттенок, светлая кромка сверху и тёмные швы
     private static void StoneFloor(int x, int y, Rectangle dest, float px)
     {
         for (var i = 0; i < 2; i++)
@@ -155,23 +143,21 @@ public static class MapRenderer
         }
     }
 
-    // Паркет: длинные доски по 4 пикселя, у каждой свой оттенок; стык доски — примерно раз в три клетки
     private static void Parquet(int x, int y, Rectangle dest, float px)
     {
         for (var row = 0; row < 4; row++)
         {
             var plank = new Rectangle(dest.X, dest.Y + row * 4 * px, dest.Width, 4 * px);
-            var board = (x + row * 5 + y * 7) / 3; // номер доски в ряду: соседние клетки часто на одной доске
+            var board = (x + row * 5 + y * 7) / 3;
             Raylib.DrawRectangleRec(plank, (Hash(board, y * 4 + row) & 1) == 0 ? Theme.Parquet : Theme.ParquetDark);
             Raylib.DrawRectangleRec(plank with { Y = plank.Y + plank.Height - px, Height = px }, Theme.ParquetSeam);
-            if ((x + row * 5 + y * 7) % 3 == 0) // здесь доска кончается
+            if ((x + row * 5 + y * 7) % 3 == 0)
             {
                 Raylib.DrawRectangleRec(new Rectangle(dest.X, plank.Y, px, plank.Height), Theme.ParquetSeam);
             }
         }
     }
 
-    // Ковёр: тёмно-красный с ромбиками, по краю — золотая кайма (там, где дальше уже не ковёр)
     private static void Carpet(GameMap map, int x, int y, Rectangle dest, float px)
     {
         Raylib.DrawRectangleRec(dest, Theme.Carpet);
@@ -186,7 +172,6 @@ public static class MapRenderer
 
     private static bool CarpetAt(GameMap map, int x, int y) => !map.IsWall(x, y) && FloorOf(map, x, y) == '~';
 
-    // Названия комнат бледно на полу — чтобы в большом особняке было понятно, где ты
     private static void DrawLabels(GameMap map, GameLayout layout)
     {
         var size = MathF.Max(16, layout.Cell * 0.5f);
@@ -197,11 +182,6 @@ public static class MapRenderer
         }
     }
 
-    // ---------- стены ----------
-
-    // Вид «три четверти», как в паке Kenney: если под стеной проход — видна кирпичная грань стены,
-    // иначе — тёмный верх стены. С тех сторон, где рядом не стена, рисуем каменный бортик.
-    // На грани стены бывают украшения: факел (W), знамя (V), оружие (Y); E — створки парадного входа.
     private static void DrawWall(GameMap map, int x, int y, Rectangle dest, int cell, double time)
     {
         var c = map[x, y];
@@ -236,7 +216,6 @@ public static class MapRenderer
         }
     }
 
-    // Бортик: от края клетки внутрь тёмная полоска, светлая, тёмная — по 2 пикселя спрайта (как в паке)
     private static void Rim(Rectangle cell, float px, Side side)
     {
         Color[] colors = { Theme.Outline, Theme.Stone, Theme.Outline };
@@ -253,7 +232,6 @@ public static class MapRenderer
         }
     }
 
-    // Факел на стене: деревянная ручка и пламя, которое чуть дрожит
     private static void DrawTorch(Rectangle dest, float px, double time, int seed)
     {
         var centerX = dest.X + dest.Width / 2;
@@ -265,11 +243,10 @@ public static class MapRenderer
         Raylib.DrawCircleV(flame with { Y = flame.Y + 0.5f * px }, 1.2f * px, Theme.FlameCore);
     }
 
-    // Дверной проём: деревянный порог из досок поперёк прохода
     private static void DrawDoor(GameMap map, int x, int y, Rectangle dest, int cell)
     {
         var px = cell / (float)Assets.SpriteSize;
-        var passageVertical = !map.IsWall(x, y - 1) && !map.IsWall(x, y + 1); // сверху и снизу проход — идём сверху вниз
+        var passageVertical = !map.IsWall(x, y - 1) && !map.IsWall(x, y + 1);
 
         var plank = passageVertical
             ? new Rectangle(dest.X, dest.Y + 4 * px, dest.Width, 8 * px)
@@ -280,7 +257,7 @@ public static class MapRenderer
             : new Rectangle(plank.X + px, plank.Y, plank.Width - 2 * px, plank.Height);
         Raylib.DrawRectangleRec(inner, Theme.Wood);
 
-        for (var i = 1; i < 4; i++) // щели между четырьмя досками
+        for (var i = 1; i < 4; i++)
         {
             var seam = passageVertical
                 ? new Rectangle(inner.X + i * 4 * px, inner.Y, px, inner.Height)
@@ -288,8 +265,6 @@ public static class MapRenderer
             Raylib.DrawRectangleRec(seam, Theme.WoodDark);
         }
     }
-
-    // ---------- мебель ----------
 
     private static void DrawFurniture(char c, int x, int y, Rectangle dest, int cell, double time)
     {
@@ -308,7 +283,7 @@ public static class MapRenderer
             case 'T':
                 Assets.DrawSprite(Sprites.Table, dest);
                 break;
-            case 'P': // стол с зельем
+            case 'P':
                 Assets.DrawSprite(Sprites.Table, dest);
                 Assets.DrawSprite(Sprites.Potions[(x + y) % Sprites.Potions.Length], Shrink(dest, 0.6f) with { Y = dest.Y });
                 break;
@@ -327,12 +302,12 @@ public static class MapRenderer
             case 'N':
                 Assets.DrawSprite(Sprites.Anvil, dest);
                 break;
-            case 'A': // алтарь со свечами
+            case 'A':
                 Assets.DrawSprite(Sprites.Pillar, dest);
                 Candle(new Vector2(dest.X + 5 * px, dest.Y + 3 * px), px, time, x);
                 Candle(new Vector2(dest.X + 11 * px, dest.Y + 3 * px), px, time, x + 3);
                 break;
-            case 'F': // чаша с зелёным огнём — светится и «дышит»
+            case 'F':
                 var pulse = 1 + 0.1f * MathF.Sin((float)time * 3 + x);
                 var center = new Vector2(dest.X + dest.Width / 2, dest.Y + dest.Height / 2);
                 Raylib.DrawCircleGradient((int)center.X, (int)center.Y, cell * 1.1f * pulse, Theme.MagicGlow, Raylib.Fade(Theme.MagicGlow, 0));
@@ -341,14 +316,13 @@ public static class MapRenderer
             case 'c':
                 Assets.DrawSprite(Sprites.Chair, Shrink(dest, 0.8f));
                 break;
-            case 's': // паук, крыса или мышь — чуть шевелится
+            case 's':
                 var wiggle = MathF.Sin((float)time * 3 + x * 2) * px;
                 Assets.DrawSprite(Sprites.Critters[Hash(x, y) % Sprites.Critters.Length], Shrink(dest, 0.7f) with { X = dest.X + dest.Width * 0.15f + wiggle });
                 break;
         }
     }
 
-    // Книжный шкаф: тёмная рама, две полки, корешки книг разного цвета и высоты
     private static void Bookshelf(int x, int y, Rectangle dest, float px)
     {
         Raylib.DrawRectangleRec(dest, Theme.Outline);
@@ -360,11 +334,11 @@ public static class MapRenderer
             for (var i = 0; i < 6; i++)
             {
                 var h = Hash(x * 7 + i, y * 3 + shelf);
-                var height = 3 + h % 3; // книги высотой 3–5 пикселей
+                var height = 3 + h % 3;
                 Raylib.DrawRectangleRec(new Rectangle(dest.X + (2 + i * 2) * px, top + (5 - height) * px, 2 * px, height * px),
                     Theme.Books[h % Theme.Books.Length]);
             }
-            Raylib.DrawRectangleRec(new Rectangle(dest.X + px, top + 5 * px, dest.Width - 2 * px, px), Theme.WoodDark); // доска полки
+            Raylib.DrawRectangleRec(new Rectangle(dest.X + px, top + 5 * px, dest.Width - 2 * px, px), Theme.WoodDark);
         }
     }
 
@@ -375,10 +349,6 @@ public static class MapRenderer
         Raylib.DrawCircleV(at with { Y = at.Y - px }, 1.2f * px * flicker, Theme.Flame);
     }
 
-    // ---------- предметы ----------
-
-    // Предметы — сундуки со свечением. Проклятый — сундук-мимик и фиолетовое свечение (бит i в curseMask).
-    // Начатое проклятие — фиолетовая полоска над сундуком; тот, что проклинают прямо сейчас, трясётся и мигает.
     private static void DrawItems(GameMap map, GameLayout layout, Snapshot snapshot, IReadOnlyList<bool> cursing, double time)
     {
         var cell = layout.Cell;
@@ -389,8 +359,8 @@ public static class MapRenderer
             var now = cursing[i];
             var glow = cursed || now ? Theme.CurseGlow : Theme.ItemGlow;
             var pulse = now
-                ? 1.3f + 0.3f * MathF.Sin((float)time * 14)          // проклинают — свечение быстро бьётся
-                : 1 + 0.12f * MathF.Sin((float)time * 4 + i);         // иначе чуть «дышит»
+                ? 1.3f + 0.3f * MathF.Sin((float)time * 14)
+                : 1 + 0.12f * MathF.Sin((float)time * 4 + i);
             Raylib.DrawCircleGradient((int)center.X, (int)center.Y, cell * 0.9f * pulse, glow, Raylib.Fade(glow, 0));
 
             var shake = now ? MathF.Sin((float)time * 40) * cell * 0.04f : 0;
@@ -406,9 +376,6 @@ public static class MapRenderer
         }
     }
 
-    // ---------- мелочи ----------
-
-    // Тот же прямоугольник, уменьшенный в scale раз, по центру
     private static Rectangle Shrink(Rectangle r, float scale)
     {
         var w = r.Width * scale;
@@ -416,6 +383,5 @@ public static class MapRenderer
         return new Rectangle(r.X + (r.Width - w) / 2, r.Y + (r.Height - h) / 2, w, h);
     }
 
-    // Псевдослучайное число по координатам: одно и то же для клетки в каждом кадре — ничего не мигает
     private static int Hash(int x, int y) => ((x * 73856093) ^ (y * 19349663)) & 0x7fffffff;
 }

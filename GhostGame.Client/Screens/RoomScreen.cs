@@ -4,7 +4,6 @@ using Raylib_cs;
 
 namespace GhostGame.Client.Screens;
 
-// Что игрок сделал в комнате в этом кадре. Program.cs превращает это в пакеты.
 public abstract record RoomAction
 {
     public sealed record ToggleReady() : RoomAction;
@@ -12,7 +11,6 @@ public abstract record RoomAction
     public sealed record Chat(string Text) : RoomAction;
 }
 
-// Экран комнаты: игроки, готовность, чат. Только рисует и сообщает, что нажали.
 public sealed class RoomScreen
 {
     private const int MaxPlayers = 5;
@@ -22,7 +20,6 @@ public sealed class RoomScreen
 
     public void Focus() => chatInput.Focused = true;
 
-    // players и hostId — из последнего RoomState: готовность показываем такой, какой её считает сервер
     public RoomAction? Draw(string roomName, int hostId, IReadOnlyList<RoomPlayer> players, int myId, IReadOnlyList<string> chat)
     {
         RoomAction? action = null;
@@ -32,7 +29,6 @@ public sealed class RoomScreen
         Ui.Text($"Комната «{roomName}»", frame.X, frame.Y, 44);
         Ui.Text("Раунд начнётся, когда в комнате 3–5 игроков и все готовы", frame.X, frame.Y + 56, 20, Theme.Muted);
 
-        // игроки
         var left = new Rectangle(frame.X, frame.Y + 100, 500, 600);
         Ui.Panel(left);
         Ui.Text($"Игроки  {players.Count}/{MaxPlayers}", left.X + 24, left.Y + 18, 26);
@@ -41,7 +37,7 @@ public sealed class RoomScreen
             var row = new Rectangle(left.X + 20, left.Y + 70 + i * 72, left.Width - 40, 62);
             if (i >= players.Count)
             {
-                Raylib.DrawRectangleRoundedLinesEx(row, 0.3f, 8, 2, Theme.PanelBorder); // свободное место — пустая рамка
+                Raylib.DrawRectangleRoundedLinesEx(row, 0.3f, 8, 2, Theme.PanelBorder);
                 Ui.Text("свободно", row.X + 70, row.Y + 20, 20, Raylib.Fade(Theme.Muted, 0.5f));
                 continue;
             }
@@ -67,13 +63,12 @@ public sealed class RoomScreen
             action = new RoomAction.Leave();
         }
 
-        // чат
         var right = new Rectangle(frame.X + 530, frame.Y + 100, 650, 600);
         Ui.Panel(right);
         Ui.Text("Чат", right.X + 24, right.Y + 18, 26);
         var area = new Rectangle(right.X + 20, right.Y + 64, right.Width - 40, right.Height - 64 - 92);
         Raylib.DrawRectangleRounded(area, 0.04f, 8, Theme.Field);
-        Raylib.BeginScissorMode((int)area.X, (int)area.Y, (int)area.Width, (int)area.Height); // длинные строки не вылезают за окно чата
+        Raylib.BeginScissorMode((int)area.X, (int)area.Y, (int)area.Width, (int)area.Height);
         var lines = chat.TakeLast((int)((area.Height - 20) / ChatLine)).ToList();
         for (var i = 0; i < lines.Count; i++)
         {
@@ -93,7 +88,6 @@ public sealed class RoomScreen
         return action;
     }
 
-    // Строка чата хранится как «ник: текст» — ник выделяем цветом
     private static void DrawChatLine(string line, float x, float y)
     {
         var colon = line.IndexOf(": ", StringComparison.Ordinal);

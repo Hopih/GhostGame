@@ -3,24 +3,20 @@ using Raylib_cs;
 
 namespace GhostGame.Client.Graphics;
 
-// Игроки: тень, фигурка, своё кольцо, ники и лучи фонарей
 public static class PlayerRenderer
 {
-    public const float FlashlightLength = 5f; // конус длиной 5 клеток
-    public const float FlashlightAngle = 60f;  // и шириной 60°
+    public const float FlashlightLength = 5f;
+    public const float FlashlightAngle = 60f;
 
-    // Фигурки рисуются до темноты — в тёмном углу игрок тоже темнеет.
-    // Охотник — свой спрайт и подпрыгивает на ходу, призрак — полупрозрачный и парит.
     public static void DrawBodies(IReadOnlyList<PlayerView> players, GameLayout layout, double time)
     {
         var cell = layout.Cell;
-        foreach (var p in players.OrderBy(p => p.Position.Y)) // кто ниже на экране, рисуется позже и оказывается впереди
+        foreach (var p in players.OrderBy(p => p.Position.Y))
         {
             var feet = layout.ToScreen(p.Position) + new Vector2(0, cell * 0.3f);
             Raylib.DrawEllipse((int)feet.X, (int)feet.Y, cell * 0.32f, cell * 0.12f, Theme.Shadow);
             if (p.IsMe)
             {
-                // себя видно по жёлтому кольцу под ногами
                 Raylib.DrawEllipseLines((int)feet.X, (int)feet.Y, cell * 0.42f, cell * 0.17f, Theme.Me);
                 Raylib.DrawEllipseLines((int)feet.X, (int)feet.Y, cell * 0.42f + 1, cell * 0.17f + 1, Theme.Me);
             }
@@ -29,7 +25,7 @@ public static class PlayerRenderer
                 ? cell * 0.15f + MathF.Sin((float)time * 3 + p.PlayerId) * cell * 0.06f
                 : p.Moving ? MathF.Abs(MathF.Sin((float)time * 14)) * cell * 0.08f : 0;
             var dest = new Rectangle(feet.X - cell / 2f, feet.Y - cell * 0.95f - lift, cell, cell);
-            var flip = p.Aim.X < p.Position.X; // смотрит туда, куда целится
+            var flip = p.Aim.X < p.Position.X;
             if (p.IsGhost)
             {
                 Assets.DrawSprite(Sprites.Ghost, dest, Theme.GhostTint, flip);
@@ -41,11 +37,8 @@ public static class PlayerRenderer
         }
     }
 
-    // Лучи поверх темноты: у охотника — тёплый свет, у призрака — красная опасная зона.
-    // Это только картинка: кого поймал луч, решает сервер.
     public static void DrawBeams(IReadOnlyList<PlayerView> players, GameLayout layout, bool ghostView)
     {
-        // за край окна луч не вылезет: GameScreen рисует всё это внутри scissor по окну в мир
         var color = ghostView ? Theme.DangerBeam : Theme.Beam;
         foreach (var p in players.Where(BeamShown))
         {
@@ -55,26 +48,22 @@ public static class PlayerRenderer
         }
     }
 
-    // Виден ли луч в этом кадре. Заряд меньше 20% — фонарь мигает, и чем меньше заряд, тем дольше гаснет.
-    // Только картинка: на сервере фонарь горит, пока не сядет совсем. Призрак тоже видит, что фонарь садится.
     public static bool BeamShown(PlayerView p)
     {
         if (!p.FlashlightOn || p.Charge >= 20)
         {
             return p.FlashlightOn;
         }
-        var phase = (Raylib.GetTime() * 9 + p.PlayerId * 0.37) % 1; // у каждого охотника своё мигание
-        var off = 0.15 + 0.35 * (1 - p.Charge / 20.0);              // доля времени, когда луч погас
+        var phase = (Raylib.GetTime() * 9 + p.PlayerId * 0.37) % 1;
+        var off = 0.15 + 0.35 * (1 - p.Charge / 20.0);
         return phase >= off;
     }
 
-    // Направление луча в градусах: 0° — вправо, дальше по часовой (ось Y на экране вниз)
     public static float BeamAngle(PlayerView p)
     {
         return MathF.Atan2(p.Aim.Y - p.Position.Y, p.Aim.X - p.Position.X) * 180f / MathF.PI;
     }
 
-    // Красная полоска поимки над призраком — пока его ловят и пока он виден
     public static void DrawCatchBar(IReadOnlyList<PlayerView> players, GameLayout layout, byte catchProgress)
     {
         if (catchProgress == 0)
@@ -86,12 +75,11 @@ public static class PlayerRenderer
         {
             var center = layout.ToScreen(p.Position);
             var width = layout.Cell * 1.3f;
-            var top = center.Y - layout.Cell * 0.95f - nickSize - 4 - 12; // над подложкой с ником
+            var top = center.Y - layout.Cell * 0.95f - nickSize - 4 - 12;
             Ui.ProgressBar(new Rectangle(center.X - width / 2, top, width, 8), catchProgress / 100f, Theme.Error);
         }
     }
 
-    // Ники рисуются поверх темноты, чтобы читались всегда
     public static void DrawNames(IReadOnlyList<PlayerView> players, GameLayout layout)
     {
         var size = MathF.Max(14, layout.Cell * 0.36f);
